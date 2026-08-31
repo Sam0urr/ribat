@@ -101,7 +101,17 @@ Share of *i*'s net energy imports sourced from *j*, computed separately for crud
 oil, refined products, natural gas (pipeline), and LNG, then aggregated by
 gross inland consumption share.
 
-**Source:** Eurostat `nrg_ti_*` and `nrg_bal_*`; IEA energy balances for non-EU.
+**Implemented (Phase 2):** WITS/Comtrade product group `Fuels` (SITC section
+3), import side only — dependency through a supply channel is an import
+concept, so exports do not enter. Same benchmark years, denominator and Taiwan
+treatment as the trade channel. Mean GPR-covered share of fuel imports is
+~0.69, lower than the trade channel because major energy exporters (Nigeria,
+Kazakhstan, Qatar, UAE, Iraq, Algeria) have no GPR series — the energy channel
+therefore *understates* exposure for their customers, and the covered share is
+reported so the reader can see by how much. The fuel-type decomposition above
+is the upgrade path.
+
+**Source (upgrade path):** Eurostat `nrg_ti_*` and `nrg_bal_*`; IEA energy balances for non-EU.
 
 ### 3.3 Critical raw materials
 
@@ -115,7 +125,14 @@ material *m*. Supply concentration is reported alongside as a
 Herfindahl–Hirschman index so that concentration and risk can be read separately
 rather than conflated.
 
-**Source:** JRC Raw Materials Information System (RMIS); Comext at HS-6.
+**Implemented (Phase 2):** WITS/Comtrade product group `OresMtls` (SITC 27 +
+28 + 68: ores, minerals and non-ferrous metals), import side only. This is a
+**proxy**: broader than the EU CRM Act list (it includes bulk commodities such
+as iron ore) and blind to criticality weighting. It is used because it is the
+finest open cut available from the same source as the other channels; the
+material-level construction above is the upgrade path.
+
+**Source (upgrade path):** JRC Raw Materials Information System (RMIS); Comext at HS-6.
 
 ### 3.4 Chokepoint transit
 
@@ -127,8 +144,23 @@ w^choke_ip = (volume of i's seaborne imports transiting p) / (total seaborne imp
 G_p,t      = weighted mean GPR of p's littoral states
 ```
 
-**Source:** EIA chokepoint volumes; UNCTADstat maritime; littoral-state mapping
-maintained manually in `data/reference/chokepoints.csv`.
+**Implemented (Phase 2):** per-importer transit volumes do not exist as open
+data, so the transit share is approximated from bilateral trade weights and a
+coarse, hand-coded region-level routing table (in `03_build_intensity.py`,
+auditable as code): `w^choke_ip = Σ_j w^trade_ij · 1{route(i,j) transits p}`,
+with intra-regional pairs assumed to transit nothing (largely overland or
+short-sea). Six chokepoints are tracked — the Red Sea corridor (Suez + Bab
+el-Mandeb as one), Hormuz, Malacca, the Taiwan Strait, the Bosphorus and the
+Danish Straits. Panama is *excluded*: no littoral or proximate state has a GPR
+series. `G_p,t` is the mean GPR of each chokepoint's GPR-covered littoral
+states (`data/reference/chokepoints.csv`); several true littorals (Iran, Oman,
+UAE, Yemen, Singapore) lack GPR series, so the channel systematically
+**understates** — most severely for Hormuz, which is proxied by Saudi GPR
+alone.
+
+**Source (upgrade path):** EIA chokepoint volumes; UNCTADstat maritime; IMF
+PortWatch transit calls; littoral mapping maintained in
+`data/reference/chokepoints.csv`.
 
 ---
 

@@ -65,7 +65,7 @@
 
 <div class="panel" id="controls">
   <h1>Ribat</h1>
-  <p class="sub">A watchpost for geopolitical exposure. Not where risk originates — who bears it. The <b>Intensity</b> index weights country GPR by dependency.</p>
+  <p class="sub">A watchpost for geopolitical exposure. Not where risk originates — who bears it. The <b>Intensity</b> index weights country GPR by trade, energy, raw-material and chokepoint dependency. The sliders are your channel mix.</p>
 
   <h2>Period</h2>
   <div class="month" id="monthLabel">—</div>
@@ -136,7 +136,9 @@ async function loadData() {
       state.placeholder = false;
       state.kind = d.kind || 'intensity';
       const b = document.getElementById('banner');
-      if (state.kind === 'intensity_trade') {
+      if (state.kind === 'intensity_multi') {
+        b.style.display = 'none';
+      } else if (state.kind === 'intensity_trade') {
         b.textContent = 'INTENSITY — trade-weighted geopolitical risk exposure. Trade channel only; energy / raw-material / chokepoint channels are Phase 2, so channel sliders are inactive.';
         for (const id of ['wTrade','wEnergy','wCrm','wChoke']) document.getElementById(id).disabled = true;
       } else if (state.kind === 'gpr_source_side') {
@@ -178,6 +180,16 @@ function synthetic() {
 function intensity(iso) {
   const rec = state.data.countries[iso];
   if (!rec) return null;
+  if (state.kind === 'intensity_multi') {
+    const w = state.weights, series = rec[state.mode];
+    let num = 0, den = 0;
+    for (const [ch, wt] of [['trade', w.trade], ['energy', w.energy], ['crm', w.crm], ['choke', w.choke]]) {
+      const v = series[ch]?.[state.idx];
+      if (v == null || Number.isNaN(v)) continue;
+      num += v * wt; den += wt;
+    }
+    return den > 0 ? num / den : null;
+  }
   if (state.kind === 'gpr_source_side' || state.kind === 'intensity_trade') {
     const v = rec[state.mode]?.[state.idx];
     return (v == null || Number.isNaN(v)) ? null : v;
@@ -279,6 +291,27 @@ function detail(iso) {
   const el = document.getElementById('detail');
   if (!rec) {
     el.innerHTML = `<h3>${iso}</h3><p class="empty">No GPR-weighted exposure computed. Either the country is outside the 44-country GPR source set, or its dependency weights have not been built yet.</p>`;
+    return;
+  }
+  if (state.kind === 'intensity_multi') {
+    const total = intensity(iso);
+    const srcs = state.data.top_sources?.[iso] || [];
+    const cov = rec.covered?.trade;
+    const chRows = [['trade','Trade'],['energy','Energy'],['crm','Raw materials'],['choke','Chokepoint']]
+      .map(([ch, lbl]) => {
+        const v = rec[state.mode]?.[ch]?.[state.idx];
+        return `<div class="metric"><span>${lbl}</span><b>${v == null ? '—' : (state.mode === 'rebased' ? v.toFixed(0) : v.toFixed(3))}</b></div>`;
+      }).join('');
+    el.innerHTML = `
+      <h3>${NAMES[iso] || iso}</h3>
+      <div class="iso">${iso} · ${state.months[state.idx]} · Intensity (${state.mode}), your channel mix</div>
+      <div class="metric"><span><b>Intensity</b></span><b>${total == null ? '—' : (state.mode === 'rebased' ? total.toFixed(1) : total.toFixed(3))}</b></div>
+      ${chRows}
+      ${cov != null ? `<div class="metric"><span>Trade observed by GPR</span><b>${(cov*100).toFixed(0)}%</b></div>` : ''}
+      ${srcs.length ? `<h2 style="margin-top:14px">Top risk sources (trade, latest month)</h2>` + srcs.map(([j,w,c]) =>
+        `<div class="metric"><span>${NAMES[j] || j} <span style="color:var(--muted)">· ${(w*100).toFixed(1)}% of trade</span></span><b>${c.toFixed(0)}</b></div>`).join('') : ''}
+      ${state.data.stale_weights?.[iso] ? `<p class="cap" style="margin-top:12px;color:var(--warn)">Stopped reporting to Comtrade after ${state.data.stale_weights[iso]}; weights carried forward from that year and increasingly unrepresentative.</p>` : ''}
+      <p class="cap" style="margin-top:12px">Channel values are per-channel exposure before your mix. Raw-materials uses an ores-and-metals proxy; chokepoint uses a coarse routing table — see METHODOLOGY.md.</p>`;
     return;
   }
   if (state.kind === 'intensity_trade') {
