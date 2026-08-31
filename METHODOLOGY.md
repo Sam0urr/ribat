@@ -208,8 +208,17 @@ dependency. They miss exposure routed through third countries: a German
 manufacturer importing intermediate goods from Poland which embody Russian
 inputs registers as exposure to Poland. The correction is to compute weights
 from value-added rather than gross flows, using OECD ICIO or WIOD
-input–output tables. This is a Phase 2 upgrade and is where the academic
-contribution, if any, would sit.
+input–output tables.
+**Implemented (Phase 3):** the interface offers a gross / value-added toggle
+for the trade channel. Value-added weights are OECD TiVA `FDVA` ("origin of
+value added in final demand", annual, currently to 2022):
+`w^va_ij = FDVA_{j→i} / FDVA_{W→i}`. Unlike the Comtrade-based weights, TiVA
+covers Taiwan, Russia and Venezuela as final-demand economies, so the
+value-added basis has no carried-forward weights. Its benchmark years (2019,
+2021, 2022) are mapped to month vintages by the same latest-benchmark-before-t
+rule. Divergence between the two bases is itself informative: where
+value-added exposure exceeds gross exposure, dependency is being routed
+through intermediary economies.
 
 **5.3 Endogeneity of the weights.** Trade shares respond to risk. An economy
 that has successfully de-risked shows *low* exposure precisely because risk was
