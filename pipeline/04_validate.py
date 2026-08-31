@@ -130,14 +130,22 @@ def t3_events(it: pd.DataFrame, out: list[str]) -> None:
         if cur.empty or base.empty:
             out += ["", f"  {month_s}  {label}: no data"]
             continue
-        delta = ((cur - base) / base * 100).replace([np.inf, -np.inf], np.nan).dropna()
-        delta = delta.sort_values(ascending=False)
-        top = ", ".join(f"{i} {v:+.0f}%" for i, v in delta.head(TOP_N).items())
+        # Two metrics, because they disagree and only one is meaningful here.
+        # Percentage change explodes for economies whose baseline exposure is
+        # near zero, so it ranks the LEAST exposed first - an artifact. Absolute
+        # change in index points is comparable across economies and is the
+        # metric the expectations were written against.
+        abs_d = (cur - base).dropna().sort_values(ascending=False)
+        pct_d = ((cur - base) / base * 100).replace([np.inf, -np.inf], np.nan).dropna()
+        top_abs = ", ".join(f"{i} {v:+.1f}" for i, v in abs_d.head(TOP_N).items())
+        top_pct = ", ".join(f"{i} {v:+.0f}%" for i, v in
+                            pct_d.sort_values(ascending=False).head(TOP_N).items())
         out += ["",
                 f"  {month_s}  {label}   [channel: {channel}]",
-                f"    expected : {expectation}",
-                f"    observed : {top}",
-                f"    median move across economies: {delta.median():+.0f}%"]
+                f"    expected      : {expectation}",
+                f"    observed (abs): {top_abs}",
+                f"    observed (pct): {top_pct}",
+                f"    median abs move: {abs_d.median():+.1f} index points"]
         if t.year < FIRST_BENCHMARK:
             out.append("    WARNING pre-2019 - weights are anachronistic (2019 vintage)")
 

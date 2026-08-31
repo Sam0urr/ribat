@@ -67,7 +67,7 @@ for r, isos in {
         REGION[iso] = r
 
 BALTIC_RIM = {"FIN", "SWE", "POL", "RUS"}
-TS_NORTH = {"CHN", "KOR", "JPN"}  # routes to these transit the Taiwan Strait
+TS_NORTH = {"CHN", "KOR", "JPN", "TWN", "HKG"}  # NE-Asian ports north of / at the strait
 ASIA = {"EASIA", "SEASIA", "SASIA"}
 
 
@@ -76,25 +76,36 @@ def transit(i: str, j: str) -> set[str]:
     if a == b:
         return set()
     pair, out = {a, b}, set()
-    east = {i, j} & (TS_NORTH if True else set())
+
+    # Russia <-> East Asia moves overland (rail) and across the Pacific, not
+    # through Suez. Treating it as a Europe-Asia sea route put Russia atop the
+    # Red Sea event studies, which is not credible.
+    if pair == {"RUS", "EASIA"}:
+        return out
 
     # Europe/Med <-> Asia/Oceania: Suez corridor
     if pair & {"EUR", "UKR", "RUS"} and pair & (ASIA | {"OCE"}):
         out.add("red_sea")
         if pair & {"EASIA", "SEASIA"}:
             out.add("malacca")
-    # Gulf (SAU) shipping: Hormuz; westbound also Red Sea
+    # Gulf (SAU) shipping: Hormuz always; Suez only for European destinations.
+    # Gulf <-> Americas is routed via the Cape or trans-Atlantic depending on
+    # coast and is too ambiguous to assign, so it gets no Red Sea transit.
     if "SAU" in (i, j):
         out.add("hormuz")
-        if pair & {"EUR", "AMER", "UKR", "RUS"}:
+        if pair & {"EUR", "UKR", "RUS"}:
             out.add("red_sea")
         if pair & {"EASIA", "SEASIA"}:
             out.add("malacca")
     # East Asia <-> South Asia / Middle East / Africa: Malacca
     if "EASIA" in pair and pair & {"SASIA", "ME", "AFR"}:
         out.add("malacca")
-    # Taiwan Strait: partner north of it, counterpart approaching from S/W
-    if east and pair & {"EUR", "ME", "SASIA", "SEASIA", "AFR", "UKR"}:
+    # Taiwan Strait: north-east Asian ports routing south or west. Explicitly
+    # NOT assigned to South-East Asia <-> China flows: those run through the
+    # South China Sea and bypass the strait entirely. Assigning them was a bug
+    # that put Vietnam and Indonesia atop the 2022-08 Taiwan crisis event study
+    # (see 04_validate.py T3).
+    if ({i, j} & TS_NORTH) and pair & {"EUR", "ME", "SASIA", "AFR", "UKR", "RUS"}:
         out.add("taiwan_strait")
     # Baltic exit
     if (i in BALTIC_RIM or j in BALTIC_RIM) and not pair <= {"EUR", "RUS"}:
