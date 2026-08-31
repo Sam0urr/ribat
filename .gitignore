@@ -1,0 +1,13 @@
+# Raw source data — regenerable, and 13 MB of WITS XML has no place in a repo.
+# 02_build_weights.py re-fetches and caches; 01 needs the GPR workbook, which
+# README step 1 documents how to retrieve.
+data/raw/
+
+# Processed intermediates. web/data/*.json IS committed — it is what the
+# published map loads — but the tidy CSVs are rebuildable from the pipeline.
+data/processed/*.csv
+data/processed/*.txt
+
+__pycache__/
+*.pyc
+.DS_Store

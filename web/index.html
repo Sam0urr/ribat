@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ribat</title>
+<link href="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --line:#272e38;
+    --ink:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --warn:#d29922;
+    --font:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--font)}
+  #map{position:absolute;inset:0}
+
+  .banner{position:absolute;top:0;left:0;right:0;z-index:20;background:var(--warn);
+    color:#1a1500;font-size:12px;font-weight:600;padding:6px 14px;letter-spacing:.02em}
+
+  .panel{position:absolute;z-index:10;background:rgba(22,27,34,.94);
+    border:1px solid var(--line);border-radius:8px;backdrop-filter:blur(8px)}
+  #controls{top:44px;left:16px;width:290px;padding:16px;max-height:calc(100% - 64px);overflow-y:auto}
+  #detail{top:44px;right:16px;width:300px;padding:16px}
+  #legend{bottom:16px;left:16px;padding:12px 14px}
+
+  h1{font-size:15px;margin:0 0 2px;letter-spacing:-.01em}
+  .sub{font-size:11px;color:var(--muted);margin:0 0 16px;line-height:1.45}
+  h2{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+    margin:18px 0 8px;font-weight:600}
+  h2:first-of-type{margin-top:0}
+
+  .row{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px}
+  .row label{flex:0 0 82px;color:var(--muted)}
+  .row output{flex:0 0 34px;text-align:right;font-family:var(--mono);font-size:11px}
+  input[type=range]{flex:1;accent-color:var(--accent);min-width:0}
+
+  .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .seg button{flex:1;background:none;border:0;color:var(--muted);font:inherit;font-size:11px;
+    padding:6px 4px;cursor:pointer}
+  .seg button[aria-pressed=true]{background:var(--accent);color:#06101f;font-weight:600}
+
+  .note{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:7px}
+  .month{font-family:var(--mono);font-size:13px;text-align:center;margin-bottom:6px}
+
+  #detail h3{margin:0 0 3px;font-size:15px}
+  #detail .iso{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:14px}
+  .metric{display:flex;justify-content:space-between;align-items:baseline;
+    padding:7px 0;border-bottom:1px solid var(--line);font-size:12px}
+  .metric:last-child{border-bottom:0}
+  .metric b{font-family:var(--mono);font-weight:600;font-size:13px}
+  .empty{font-size:12px;color:var(--muted);line-height:1.5}
+
+  .ramp{display:flex;height:9px;width:190px;border-radius:2px;overflow:hidden;margin-bottom:5px}
+  .ramp i{flex:1}
+  .ticks{display:flex;justify-content:space-between;font-family:var(--mono);
+    font-size:10px;color:var(--muted);width:190px}
+  .cap{font-size:10px;color:var(--muted);margin-top:8px;max-width:190px;line-height:1.45}
+</style>
+</head>
+<body>
+<div class="banner" id="banner">Loading…</div>
+<div id="map"></div>
+
+<div class="panel" id="controls">
+  <h1>Ribat</h1>
+  <p class="sub">A watchpost for geopolitical exposure. Not where risk originates — who bears it. The <b>Intensity</b> index weights country GPR by dependency.</p>
+
+  <h2>Period</h2>
+  <div class="month" id="monthLabel">—</div>
+  <input type="range" id="time" min="0" max="0" value="0" style="width:100%">
+
+  <h2>Normalisation</h2>
+  <div class="seg" role="group">
+    <button id="btnRebased" aria-pressed="true">Rebased</button>
+    <button id="btnLevel" aria-pressed="false">Level</button>
+  </div>
+  <p class="note" id="normNote">Each source country indexed to its own 1985–2023 mean = 100. Detects deterioration; understates chronically high-risk states.</p>
+
+  <h2>Channel weights</h2>
+  <div class="row"><label for="wTrade">Trade</label><input type="range" id="wTrade" min="0" max="100" value="55"><output id="oTrade">55</output></div>
+  <div class="row"><label for="wEnergy">Energy</label><input type="range" id="wEnergy" min="0" max="100" value="25"><output id="oEnergy">25</output></div>
+  <div class="row"><label for="wCrm">Raw mat.</label><input type="range" id="wCrm" min="0" max="100" value="10"><output id="oCrm">10</output></div>
+  <div class="row"><label for="wChoke">Chokepoint</label><input type="range" id="wChoke" min="0" max="100" value="10"><output id="oChoke">10</output></div>
+  <p class="note">Weights renormalise to sum to 1. There is no correct fixed weighting — move them and read the result as a sensitivity analysis, not a ranking.</p>
+
+  <h2>Projection</h2>
+  <div class="seg" role="group">
+    <button id="btnGlobe" aria-pressed="true">Globe</button>
+    <button id="btnFlat" aria-pressed="false">Flat</button>
+  </div>
+</div>
+
+<div class="panel" id="detail">
+  <p class="empty">Select a country to see its exposure decomposition and largest risk-weighted dependencies.</p>
+</div>
+
+<div class="panel" id="legend">
+  <div class="ramp" id="ramp"></div>
+  <div class="ticks"><span>low</span><span>exposure</span><span>high</span></div>
+  <p class="cap">Boundaries: Natural Earth (public domain). GPR: Caldara &amp; Iacoviello (2022), CC-BY.</p>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script>
+// ---------------------------------------------------------------------------
+// Colour ramp — sequential, dark-background safe.
+// ---------------------------------------------------------------------------
+const RAMP = ['#123b56','#1b5e73','#3f7f6a','#8a9a4a','#c9973b','#dd6a35','#c9353f'];
+const rampEl = document.getElementById('ramp');
+RAMP.forEach(c => { const i = document.createElement('i'); i.style.background = c; rampEl.appendChild(i); });
+
+const colourFor = t => RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.floor(t * RAMP.length)))];
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+const state = {
+  months: [], idx: 0, mode: 'rebased', selected: null,
+  weights: { trade: 55, energy: 25, crm: 10, choke: 10 },
+  data: null, placeholder: true, kind: 'intensity'
+};
+
+// ---------------------------------------------------------------------------
+// Data loading. Real pipeline output wins; synthetic fallback keeps the layout
+// inspectable before the GPR workbook has been downloaded.
+// ---------------------------------------------------------------------------
+async function loadData() {
+  try {
+    for (const url of ['./data/intensity.json', './data/gpr.json']) {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) continue;
+      const d = await r.json();
+      state.placeholder = false;
+      state.kind = d.kind || 'intensity';
+      const b = document.getElementById('banner');
+      if (state.kind === 'intensity_trade') {
+        b.textContent = 'INTENSITY — trade-weighted geopolitical risk exposure. Trade channel only; energy / raw-material / chokepoint channels are Phase 2, so channel sliders are inactive.';
+        for (const id of ['wTrade','wEnergy','wCrm','wChoke']) document.getElementById(id).disabled = true;
+      } else if (state.kind === 'gpr_source_side') {
+        b.textContent = 'SOURCE-SIDE GPR — real Caldara & Iacoviello data. This is where risk is reported, NOT who bears it. Exposure weighting (Intensity) not yet built, so channel weights are inactive.';
+        for (const id of ['wTrade','wEnergy','wCrm','wChoke']) document.getElementById(id).disabled = true;
+      } else {
+        b.style.display = 'none';
+      }
+      return d;
+    }
+  } catch (_) { /* fall through to synthetic */ }
+  document.getElementById('banner').textContent = 'PLACEHOLDER DATA — synthetic values for layout only. Run pipeline/01_load_gpr.py.';
+  return synthetic();
+}
+
+// Deterministic pseudo-random so the placeholder is stable across reloads.
+function hash(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 10000) / 10000; }
+
+function synthetic() {
+  const months = [];
+  for (let y = 2015; y <= 2026; y++) for (let m = 1; m <= 12; m++) {
+    if (y === 2026 && m > 7) break;
+    months.push(`${y}-${String(m).padStart(2, '0')}`);
+  }
+  const isos = ['DEU','FRA','ITA','NLD','ESP','POL','BEL','SWE','DNK','FIN','NOR','PRT','CHE','HUN','GBR','UKR','RUS','TUR','USA','CAN','MEX','BRA','ARG','CHL','COL','PER','VEN','CHN','JPN','KOR','IND','IDN','MYS','THA','VNM','PHL','TWN','HKG','AUS','SAU','ISR','EGY','ZAF','TUN'];
+  const rows = {};
+  for (const iso of isos) {
+    const base = 0.15 + hash(iso) * 0.6;
+    rows[iso] = months.map((mo, i) => {
+      const drift = Math.sin((i / 14) + hash(iso + 'p') * 6) * 0.16;
+      const shock = hash(iso + mo) > 0.965 ? 0.35 : 0;
+      const v = Math.max(0.02, base + drift + shock);
+      return { trade: v, energy: v * (0.5 + hash(iso + 'e')), crm: v * (0.4 + hash(iso + 'c')), choke: v * (0.3 + hash(iso + 'k')) };
+    });
+  }
+  return { months, mode_available: ['rebased', 'level'], countries: rows, covered_trade_share: Object.fromEntries(isos.map(i => [i, 0.55 + hash(i + 'cov') * 0.4])) };
+}
+
+function intensity(iso) {
+  const rec = state.data.countries[iso];
+  if (!rec) return null;
+  if (state.kind === 'gpr_source_side' || state.kind === 'intensity_trade') {
+    const v = rec[state.mode]?.[state.idx];
+    return (v == null || Number.isNaN(v)) ? null : v;
+  }
+  const p = rec[state.idx];
+  if (!p) return null;
+  const w = state.weights, sum = w.trade + w.energy + w.crm + w.choke || 1;
+  const v = (p.trade * w.trade + p.energy * w.energy + p.crm * w.crm + p.choke * w.choke) / sum;
+  return state.mode === 'level' ? v * 0.75 : v;
+}
+
+// Colour scaling. Linear min-max is wrong here: a single war pushes one country
+// to 20x the median and flattens everyone else into the bottom bucket.
+// Rebased has an interpretable anchor (100 = that country's own 1985-2023 mean),
+// so it gets fixed breaks. Level has no such anchor, so it gets percentile ranks.
+const REBASED_BREAKS = [50, 80, 100, 130, 180, 260];
+
+function bucket(v, sorted) {
+  if (state.mode === 'rebased' && state.kind === 'gpr_source_side') {
+    let i = 0; while (i < REBASED_BREAKS.length && v >= REBASED_BREAKS[i]) i++;
+    return i / RAMP.length;
+  }
+  let lo = 0, hi = sorted.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; }
+  return sorted.length ? lo / sorted.length : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Map
+// ---------------------------------------------------------------------------
+const map = new maplibregl.Map({
+  container: 'map',
+  style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0d1117' } }] },
+  center: [12, 25], zoom: 0.55, attributionControl: false
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+let world = null;
+
+map.on('load', async () => {
+  try { map.setProjection({ type: 'globe' }); } catch (_) { /* older MapLibre: flat only */ }
+
+  const [topo, data] = await Promise.all([
+    fetch('./data/countries-50m.json').then(r => r.json()),
+    loadData()
+  ]);
+  state.data = data;
+  state.months = data.months;
+  state.idx = data.months.length - 1;
+
+  world = topojson.feature(topo, topo.objects.countries);
+  // world-atlas carries numeric ISO 3166-1 ids; map to alpha-3.
+  // Natural Earth zero-pads numeric ids ("032"); NUM_TO_A3 keys stringify
+  // without padding ("32"), so codes below 100 miss unless normalised.
+  for (const f of world.features) f.properties.iso3 = NUM_TO_A3[Number(f.id)] || null;
+
+  map.addSource('countries', { type: 'geojson', data: world });
+  map.addLayer({ id: 'fill', type: 'fill', source: 'countries', paint: { 'fill-color': ['coalesce', ['feature-state', 'colour'], '#1c222b'], 'fill-opacity': 0.9 } });
+  map.addLayer({ id: 'line', type: 'line', source: 'countries', paint: { 'line-color': '#0d1117', 'line-width': 0.4 } });
+  map.addLayer({ id: 'sel', type: 'line', source: 'countries', paint: { 'line-color': '#e6edf3', 'line-width': 1.6 }, filter: ['==', 'iso3', ''] });
+
+  const slider = document.getElementById('time');
+  slider.max = state.months.length - 1;
+  slider.value = state.idx;
+
+  map.on('click', 'fill', e => select(e.features[0].properties.iso3));
+  map.on('mouseenter', 'fill', () => map.getCanvas().style.cursor = 'pointer');
+  map.on('mouseleave', 'fill', () => map.getCanvas().style.cursor = '');
+
+  render();
+  map.once('idle', render);
+});
+
+function render() {
+  if (!world) return;
+  const sorted = world.features
+    .map(f => f.properties.iso3 && intensity(f.properties.iso3))
+    .filter(v => v != null).sort((a, b) => a - b);
+
+  for (const f of world.features) {
+    const v = f.properties.iso3 && intensity(f.properties.iso3);
+    map.setFeatureState({ source: 'countries', id: f.id }, { colour: v == null ? '#1c222b' : colourFor(bucket(v, sorted)) });
+  }
+  document.getElementById('monthLabel').textContent = state.months[state.idx] || '—';
+  if (state.selected) detail(state.selected);
+}
+
+function select(iso) {
+  if (!iso) return;
+  state.selected = iso;
+  map.setFilter('sel', ['==', 'iso3', iso]);
+  detail(iso);
+}
+
+const CHANNELS = [['trade','Trade'],['energy','Energy'],['crm','Critical raw materials'],['choke','Chokepoint transit']];
+
+function detail(iso) {
+  const rec = state.data.countries[iso];
+  const el = document.getElementById('detail');
+  if (!rec) {
+    el.innerHTML = `<h3>${iso}</h3><p class="empty">No GPR-weighted exposure computed. Either the country is outside the 44-country GPR source set, or its dependency weights have not been built yet.</p>`;
+    return;
+  }
+  if (state.kind === 'intensity_trade') {
+    const lvl = rec.level?.[state.idx], reb = rec.rebased?.[state.idx];
+    const srcs = state.data.top_sources?.[iso] || [];
+    el.innerHTML = `
+      <h3>${NAMES[iso] || iso}</h3>
+      <div class="iso">${iso} · ${state.months[state.idx]} · trade-weighted Intensity</div>
+      <div class="metric"><span>Intensity (rebased)</span><b>${reb == null ? '—' : reb.toFixed(1)}</b></div>
+      <div class="metric"><span>Intensity (level)</span><b>${lvl == null ? '—' : lvl.toFixed(3)}</b></div>
+      <div class="metric"><span>Trade observed by GPR</span><b>${rec.covered != null ? (rec.covered*100).toFixed(0)+'%' : '—'}</b></div>
+      ${srcs.length ? `<h2 style="margin-top:14px">Top risk sources (latest month)</h2>` + srcs.map(([j,w,c]) =>
+        `<div class="metric"><span>${NAMES[j] || j} <span style="color:var(--muted)">· ${(w*100).toFixed(1)}% of trade</span></span><b>${c.toFixed(0)}</b></div>`).join('') : ''}
+      ${state.data.stale_weights?.[iso] ? `<p class="cap" style="margin-top:12px;color:var(--warn)">Stopped reporting to Comtrade after ${state.data.stale_weights[iso]}; weights carried forward from that year and increasingly unrepresentative.</p>` : ''}
+      <p class="cap" style="margin-top:12px">${rec.covered != null && rec.covered < 0.7
+        ? 'Coverage below 70% — a material share of this economy\'s trade partners have no GPR series, so exposure is biased downward.'
+        : 'Weights are lagged benchmark-year trade shares (see METHODOLOGY.md §5.3). Not a forecast.'}</p>`;
+    return;
+  }
+  if (state.kind === 'gpr_source_side') {
+    const lvl = rec.level?.[state.idx], reb = rec.rebased?.[state.idx];
+    el.innerHTML = `
+      <h3>${NAMES[iso] || iso}</h3>
+      <div class="iso">${iso} · ${state.months[state.idx]} · source-side GPR</div>
+      <div class="metric"><span>GPR (article share)</span><b>${lvl == null ? '—' : lvl.toFixed(3)}</b></div>
+      <div class="metric"><span>Rebased (own mean = 100)</span><b>${reb == null ? '—' : reb.toFixed(0)}</b></div>
+      <p class="cap" style="margin-top:12px">Risk reported <em>about</em> this country in ten anglophone newspapers — not risk borne <em>by</em> it. Exposure weighting is Phase 1; see METHODOLOGY.md §1.</p>`;
+    return;
+  }
+  const p = rec[state.idx], total = intensity(iso);
+  const cov = state.data.covered_trade_share?.[iso];
+  el.innerHTML = `
+    <h3>${NAMES[iso] || iso}</h3>
+    <div class="iso">${iso} · ${state.months[state.idx]} · ${state.mode}</div>
+    <div class="metric"><span>Exposure index</span><b>${total.toFixed(2)}</b></div>
+    ${CHANNELS.map(([k, lbl]) => `<div class="metric"><span>${lbl}</span><b>${p[k].toFixed(2)}</b></div>`).join('')}
+    ${cov != null ? `<div class="metric"><span>Trade observed by GPR</span><b>${(cov*100).toFixed(0)}%</b></div>` : ''}
+    <p class="cap" style="margin-top:12px">${cov != null && cov < 0.7 ? 'Coverage below 70% — a material share of this economy\'s trade partners have no GPR series, so exposure is biased downward.' : 'Contemporaneous measure of reported exposure. Not a forecast.'}</p>`;
+}
+
+// ---------------------------------------------------------------------------
+// Controls
+// ---------------------------------------------------------------------------
+document.getElementById('time').addEventListener('input', e => { state.idx = +e.target.value; render(); });
+
+for (const [id, key] of [['wTrade','trade'],['wEnergy','energy'],['wCrm','crm'],['wChoke','choke']]) {
+  document.getElementById(id).addEventListener('input', e => {
+    state.weights[key] = +e.target.value;
+    document.getElementById('o' + id.slice(1)).value = e.target.value;
+    render();
+  });
+}
+
+const NOTES = {
+  rebased: 'Each source country indexed to its own 1985–2023 mean = 100. Detects deterioration; understates chronically high-risk states.',
+  level:   'Raw article shares on a common scale. Comparable across countries; dominated by persistent level differences.'
+};
+function setMode(m) {
+  state.mode = m;
+  document.getElementById('btnRebased').setAttribute('aria-pressed', m === 'rebased');
+  document.getElementById('btnLevel').setAttribute('aria-pressed', m === 'level');
+  document.getElementById('normNote').textContent = NOTES[m];
+  render();
+}
+document.getElementById('btnRebased').onclick = () => setMode('rebased');
+document.getElementById('btnLevel').onclick = () => setMode('level');
+
+function setProj(kind) {
+  try { map.setProjection({ type: kind }); } catch (_) {}
+  document.getElementById('btnGlobe').setAttribute('aria-pressed', kind === 'globe');
+  document.getElementById('btnFlat').setAttribute('aria-pressed', kind === 'mercator');
+}
+document.getElementById('btnGlobe').onclick = () => setProj('globe');
+document.getElementById('btnFlat').onclick = () => setProj('mercator');
+
+// ---------------------------------------------------------------------------
+// ISO 3166-1 numeric -> alpha-3, restricted to the 44 GPR countries.
+// ---------------------------------------------------------------------------
+const NUM_TO_A3 = {124:'CAN',484:'MEX',840:'USA',32:'ARG',76:'BRA',152:'CHL',170:'COL',604:'PER',862:'VEN',
+208:'DNK',246:'FIN',348:'HUN',578:'NOR',616:'POL',643:'RUS',752:'SWE',804:'UKR',826:'GBR',
+56:'BEL',250:'FRA',276:'DEU',380:'ITA',528:'NLD',620:'PRT',724:'ESP',756:'CHE',
+818:'EGY',376:'ISR',682:'SAU',710:'ZAF',788:'TUN',792:'TUR',
+36:'AUS',156:'CHN',344:'HKG',392:'JPN',410:'KOR',608:'PHL',158:'TWN',360:'IDN',356:'IND',458:'MYS',764:'THA',704:'VNM'};
+
+const NAMES = {CAN:'Canada',MEX:'Mexico',USA:'United States',ARG:'Argentina',BRA:'Brazil',CHL:'Chile',COL:'Colombia',PER:'Peru',VEN:'Venezuela',DNK:'Denmark',FIN:'Finland',HUN:'Hungary',NOR:'Norway',POL:'Poland',RUS:'Russia',SWE:'Sweden',UKR:'Ukraine',GBR:'United Kingdom',BEL:'Belgium',FRA:'France',DEU:'Germany',ITA:'Italy',NLD:'Netherlands',PRT:'Portugal',ESP:'Spain',CHE:'Switzerland',EGY:'Egypt',ISR:'Israel',SAU:'Saudi Arabia',ZAF:'South Africa',TUN:'Tunisia',TUR:'Turkey',AUS:'Australia',CHN:'China',HKG:'Hong Kong',JPN:'Japan',KOR:'South Korea',PHL:'Philippines',TWN:'Taiwan',IDN:'Indonesia',IND:'India',MYS:'Malaysia',THA:'Thailand',VNM:'Vietnam'};
+</script>
+</body>
+</html>
