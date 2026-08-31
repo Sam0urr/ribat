@@ -139,6 +139,16 @@ def main() -> None:
         frames.append(pd.read_csv(ch_path))
     else:
         print("NOTE channel_weights.csv missing — energy/crm channels skipped")
+    # Phase 3: value-added weights (OECD TiVA FDVA). Not a separate exposure
+    # channel — an alternative measurement basis for the trade channel; the
+    # interface offers it as a gross/value-added toggle. TiVA benchmark years
+    # (2019, 2021, 2022) differ from Comtrade's; carry_forward handles the
+    # mapping (2022 serves the 2023 target vintage).
+    va_path = PROC / "va_weights.csv"
+    if va_path.exists():
+        frames.append(pd.read_csv(va_path))
+    else:
+        print("NOTE va_weights.csv missing — value-added basis skipped")
     w_all = pd.concat(frames, ignore_index=True)
     years = sorted(trade["year"].unique())
 

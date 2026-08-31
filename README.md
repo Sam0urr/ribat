@@ -40,7 +40,7 @@ are satisfied by sequencing, not by building four things.
 |---|---|---|
 | **1. Prototype** | Trade-weighted Intensity, 44 source countries, ~40 exposed economies, monthly 1985–present, time slider, adjustable channel weights | Portfolio |
 | **2. Full channels** | Energy, CRM and chokepoint layers; covered-trade-share reporting; rebased/level toggle | Portfolio, research |
-| **3. Value-added weights** | OECD ICIO input–output weights replacing gross bilateral flows; addresses limitation 5.2 | Research, academic |
+| **3. Value-added weights** | OECD TiVA FDVA weights as a gross/value-added toggle on the trade channel; addresses limitation 5.2 | Research, academic |
 | **4. Methods note** | Short paper documenting construction, validation against known episodes, replication files | Academic |
 | **5. Scheduled refresh** | Monthly pipeline run on GPR update (first business day of month), automated deploy | Public tool |
 
@@ -88,9 +88,11 @@ requests at runtime.
 │   ├── reference/          hand-maintained lookups (chokepoints, ISO codes)
 │   └── processed/          pipeline output consumed by the web layer
 ├── pipeline/
-│   ├── 01_load_gpr.py           parse GPR workbook, validate coverage
-│   ├── 02_build_weights.py      fetch WITS trade data, build weights
-│   └── 03_build_intensity.py    join GPR x weights, export web payload
+│   ├── 01_load_gpr.py               parse GPR workbook, validate coverage
+│   ├── 02_build_weights.py          WITS gross trade weights
+│   ├── 02b_build_channel_weights.py WITS fuels + ores/metals weights
+│   ├── 02c_build_va_weights.py      OECD TiVA value-added weights
+│   └── 03_build_intensity.py        join GPR x weights, export web payload
 └── web/
     ├── data/                    payload + vendored country polygons
     └── index.html               MapLibre front end
@@ -115,9 +117,11 @@ are preliminary and subject to revision.
 
 ```bash
 pip install pandas xlrd openpyxl requests
-python3 pipeline/01_load_gpr.py        # GPR workbook  -> tidy series
-python3 pipeline/02_build_weights.py   # WITS trade    -> dependency weights
-python3 pipeline/03_build_intensity.py # join          -> web/data/intensity.json
+python3 pipeline/01_load_gpr.py               # GPR workbook -> tidy series
+python3 pipeline/02_build_weights.py          # WITS gross trade weights
+python3 pipeline/02b_build_channel_weights.py # energy + raw-material weights
+python3 pipeline/02c_build_va_weights.py      # value-added weights (OECD TiVA)
+python3 pipeline/03_build_intensity.py        # join -> web/data/intensity.json
 ```
 
 `02` fetches 264 WITS responses on first run (~5 min) and caches them under

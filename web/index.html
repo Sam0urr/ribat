@@ -85,6 +85,13 @@
   <div class="row"><label for="wChoke">Chokepoint</label><input type="range" id="wChoke" min="0" max="100" value="10"><output id="oChoke">10</output></div>
   <p class="note">Weights renormalise to sum to 1. There is no correct fixed weighting — move them and read the result as a sensitivity analysis, not a ranking.</p>
 
+  <h2 id="basisHead">Trade weight basis</h2>
+  <div class="seg" role="group" id="basisSeg">
+    <button id="btnGross" aria-pressed="true">Gross trade</button>
+    <button id="btnVA" aria-pressed="false">Value added</button>
+  </div>
+  <p class="note" id="basisNote">Gross: bilateral goods flows (Comtrade). Value added: origin of value added in final demand (OECD TiVA) — looks through third countries, so exposure routed via intermediaries is attributed to its true origin.</p>
+
   <h2>Projection</h2>
   <div class="seg" role="group">
     <button id="btnGlobe" aria-pressed="true">Globe</button>
@@ -120,7 +127,7 @@ const colourFor = t => RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.floor(t *
 const state = {
   months: [], idx: 0, mode: 'rebased', selected: null,
   weights: { trade: 55, energy: 25, crm: 10, choke: 10 },
-  data: null, placeholder: true, kind: 'intensity'
+  data: null, placeholder: true, kind: 'intensity', basis: 'trade'
 };
 
 // ---------------------------------------------------------------------------
@@ -138,6 +145,9 @@ async function loadData() {
       const b = document.getElementById('banner');
       if (state.kind === 'intensity_multi') {
         b.style.display = 'none';
+        if (!(d.channels || []).includes('va')) {
+          for (const id of ['basisHead','basisSeg','basisNote']) document.getElementById(id).style.display = 'none';
+        }
       } else if (state.kind === 'intensity_trade') {
         b.textContent = 'INTENSITY — trade-weighted geopolitical risk exposure. Trade channel only; energy / raw-material / chokepoint channels are Phase 2, so channel sliders are inactive.';
         for (const id of ['wTrade','wEnergy','wCrm','wChoke']) document.getElementById(id).disabled = true;
@@ -183,7 +193,7 @@ function intensity(iso) {
   if (state.kind === 'intensity_multi') {
     const w = state.weights, series = rec[state.mode];
     let num = 0, den = 0;
-    for (const [ch, wt] of [['trade', w.trade], ['energy', w.energy], ['crm', w.crm], ['choke', w.choke]]) {
+    for (const [ch, wt] of [[state.basis, w.trade], ['energy', w.energy], ['crm', w.crm], ['choke', w.choke]]) {
       const v = series[ch]?.[state.idx];
       if (v == null || Number.isNaN(v)) continue;
       num += v * wt; den += wt;
@@ -297,7 +307,7 @@ function detail(iso) {
     const total = intensity(iso);
     const srcs = state.data.top_sources?.[iso] || [];
     const cov = rec.covered?.trade;
-    const chRows = [['trade','Trade'],['energy','Energy'],['crm','Raw materials'],['choke','Chokepoint']]
+    const chRows = [[state.basis, state.basis === 'va' ? 'Trade (value added)' : 'Trade (gross)'],['energy','Energy'],['crm','Raw materials'],['choke','Chokepoint']]
       .map(([ch, lbl]) => {
         const v = rec[state.mode]?.[ch]?.[state.idx];
         return `<div class="metric"><span>${lbl}</span><b>${v == null ? '—' : (state.mode === 'rebased' ? v.toFixed(0) : v.toFixed(3))}</b></div>`;
@@ -384,6 +394,15 @@ function setProj(kind) {
   document.getElementById('btnGlobe').setAttribute('aria-pressed', kind === 'globe');
   document.getElementById('btnFlat').setAttribute('aria-pressed', kind === 'mercator');
 }
+function setBasis(b) {
+  state.basis = b;
+  document.getElementById('btnGross').setAttribute('aria-pressed', b === 'trade');
+  document.getElementById('btnVA').setAttribute('aria-pressed', b === 'va');
+  render();
+}
+document.getElementById('btnGross').onclick = () => setBasis('trade');
+document.getElementById('btnVA').onclick = () => setBasis('va');
+
 document.getElementById('btnGlobe').onclick = () => setProj('globe');
 document.getElementById('btnFlat').onclick = () => setProj('mercator');
 
