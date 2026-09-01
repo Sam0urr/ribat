@@ -1,0 +1,93 @@
+name: Monthly data refresh
+
+# The GPR workbook is republished on the first business day of each month, and
+# slips when that day is a US federal holiday. Rather than guess the date, run
+# every day of the first week and exit without committing when the data is
+# unchanged — which is also what happens on every run after the real update.
+on:
+  schedule:
+    - cron: '17 12 1-7 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install --quiet pandas numpy xlrd openpyxl
+
+      - name: Download GPR workbook
+        run: |
+          mkdir -p data/raw
+          curl -sSL --fail --retry 3 --retry-delay 10 \
+            -o data/raw/data_gpr_export.xls \
+            https://www.matteoiacoviello.com/gpr_files/data_gpr_export.xls
+          file data/raw/data_gpr_export.xls
+
+      # Only 01 and 03 run monthly. The dependency weights (02, 02b, 02c) are
+      # benchmark-year cross-sections committed to the repo; refetching 300+
+      # WITS/OECD responses every month for annual data would be abuse.
+      - name: Rebuild index
+        run: |
+          python3 pipeline/01_load_gpr.py
+          python3 pipeline/03_build_intensity.py
+          python3 pipeline/04_validate.py
+
+      # Compare the DATA, not the file: every payload carries a build timestamp,
+      # so a plain `git diff` would report a change on every single run and
+      # commit noise forever. Hashing the country series also catches the
+      # revisions to prior months that Iacoviello warns about, not just a new
+      # month appearing.
+      - name: Detect a genuine new vintage
+        id: check
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, subprocess
+          def digest(txt):
+              d = json.loads(txt)
+              return hashlib.sha256(json.dumps(
+                  {"m": d["months"], "c": d["countries"]}, sort_keys=True
+              ).encode()).hexdigest()
+          new = digest(open("web/data/gpr.json").read())
+          try:
+              old = digest(subprocess.check_output(
+                  ["git", "show", "HEAD:web/data/gpr.json"], text=True))
+          except subprocess.CalledProcessError:
+              old = None
+          changed = new != old
+          print(f"previous {old}\ncurrent  {new}\nchanged  {changed}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"changed={'true' if changed else 'false'}\n")
+          with open("web/data/gpr.json") as f:
+              f2 = json.load(f)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write(f"GPR data through **{f2['months'][-1]}** — "
+                      f"{'new vintage, publishing' if changed else 'unchanged, nothing to publish'}\n")
+          PY
+
+      - name: Commit and publish
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f web/data/gpr.json web/data/intensity.json \
+                     data/processed/validation_report.txt
+          MONTH=$(python3 -c "import json;print(json.load(open('web/data/gpr.json'))['months'][-1])")
+          git commit -m "Data refresh: GPR through ${MONTH}
+
+          Automated monthly rebuild. Latest months are preliminary and subject
+          to revision as delayed newspaper editions enter the search database."
+          git push

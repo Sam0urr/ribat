@@ -97,7 +97,7 @@ def export_web(tidy: pd.DataFrame) -> None:
         "months": month_labels,
         "countries": countries,
         "source": "Caldara & Iacoviello (2022), country-specific GPR, CC-BY",
-        "downloaded": "2026-08-31",
+        "downloaded": date.today().isoformat(),
     }
     web_dir = ROOT / "web" / "data"
     web_dir.mkdir(parents=True, exist_ok=True)

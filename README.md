@@ -42,11 +42,38 @@ are satisfied by sequencing, not by building four things.
 | **2. Full channels** | Energy, CRM and chokepoint layers; covered-trade-share reporting; rebased/level toggle | Portfolio, research |
 | **3. Value-added weights** | OECD TiVA FDVA weights as a gross/value-added toggle on the trade channel; addresses limitation 5.2 | Research, academic |
 | **4. Methods note** | Short paper documenting construction, validation against known episodes, replication files | Academic |
-| **5. Scheduled refresh** | Monthly pipeline run on GPR update (first business day of month), automated deploy | Public tool |
+| **5. Scheduled refresh** ✅ | `.github/workflows/refresh.yml` — rebuilds and republishes when a new GPR vintage appears | Public tool |
 
 Phases 1–2 are the shippable artefact. Phase 3 is where an original contribution
-would sit, and it is optional. Phase 5 is the only phase that creates ongoing
-maintenance obligation — do not start it before 1–2 are stable.
+would sit. Phase 4's validation suite ships; its written methods note does not yet.
+
+---
+
+## Automatic refresh
+
+`.github/workflows/refresh.yml` runs at 12:17 UTC on days 1–7 of each month, and
+on manual dispatch. It downloads the GPR workbook, re-runs stages 01, 03 and 04,
+and publishes **only if the data genuinely changed**.
+
+Three decisions worth knowing:
+
+- **Only 01 and 03 re-run monthly.** The dependency weights (02, 02b, 02c) are
+  benchmark-year cross-sections; re-fetching 300+ WITS and OECD responses every
+  month for annual data would be abuse of those services. The three weight CSVs
+  are therefore committed (~700 KB), which also makes the repository runnable
+  without a 15 MB WITS re-fetch.
+- **Change detection hashes the data, not the file.** Every payload carries a
+  build timestamp, so a plain `git diff` would report a change on every run and
+  commit noise forever. The job hashes `{months, countries}` from `gpr.json`,
+  which also catches the revisions to *prior* months that Iacoviello warns
+  about — not merely a new month appearing.
+- **Days 1–7, not "the first business day".** GPR posts on the first business
+  day and slips for US federal holidays. Rather than encode a holiday calendar,
+  the job runs daily for a week and exits quietly when the vintage is unchanged.
+
+A failed run surfaces as a failed GitHub Action (and an email). The map footer
+now prints the month the data runs through, so a silent stall is visible to
+readers rather than only to the maintainer.
 
 ---
 

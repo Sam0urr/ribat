@@ -124,6 +124,7 @@
   <div class="ramp" id="ramp"></div>
   <div class="ticks" id="ticks"></div>
   <div class="legend-unit" id="legendUnit">—</div>
+  <p class="cap" id="currency">—</p>
   <p class="cap">Boundaries: Natural Earth (public domain). GPR: Caldara &amp; Iacoviello (2022), CC-BY.</p>
 </div>
 
@@ -183,6 +184,10 @@ async function loadData() {
       } else {
         b.style.display = 'none';
       }
+      const cur = document.getElementById('currency');
+      if (cur) cur.textContent = `Data through ${d.months[d.months.length - 1]}`
+        + (d.generated ? ` · built ${d.generated}` : '')
+        + '. Latest months are preliminary and subject to revision.';
       return d;
     }
   } catch (_) { /* fall through to synthetic */ }
