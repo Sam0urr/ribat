@@ -30,7 +30,8 @@
     display:flex;flex-direction:column;gap:12px;pointer-events:none}
   #left > *{pointer-events:auto}
   #controls{position:static;padding:16px;flex:1 1 auto;min-height:0;overflow-y:auto}
-  #detail{top:44px;right:16px;width:300px;padding:16px}
+  #detail{top:44px;right:16px;width:300px;padding:16px;
+    max-height:calc(100vh - 60px);overflow-y:auto;overscroll-behavior:contain}
   #legend{position:static;padding:12px 14px;flex:0 0 auto}
 
   h1{font-size:15px;margin:0 0 2px;letter-spacing:-.01em}
@@ -54,6 +55,10 @@
 
   #detail h3{margin:0 0 3px;font-size:15px}
   #detail .iso{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:14px}
+  .spark{width:100%;height:auto;display:block;margin:2px 0 3px}
+  .spark-cap{display:flex;justify-content:space-between;font-family:var(--mono);
+    font-size:9.5px;color:var(--muted);margin:0 0 12px;letter-spacing:.02em}
+  @media (prefers-reduced-motion:no-preference){.spark path{transition:d .15s linear}}
   .metric{display:flex;justify-content:space-between;align-items:baseline;
     padding:7px 0;border-bottom:1px solid var(--line);font-size:12px}
   .metric:last-child{border-bottom:0}
@@ -228,24 +233,28 @@ function synthetic() {
   return { months, mode_available: ['rebased', 'level'], countries: rows, covered_trade_share: Object.fromEntries(isos.map(i => [i, 0.55 + hash(i + 'cov') * 0.4])) };
 }
 
-function intensity(iso) {
+function intensity(iso) { return intensityAt(iso, state.idx); }
+
+/* Same computation at an arbitrary month index, so the detail panel can
+   draw a full series without duplicating the mix logic. */
+function intensityAt(iso, i) {
   const rec = state.data.countries[iso];
   if (!rec) return null;
   if (state.kind === 'intensity_multi') {
     const w = state.weights, series = rec[state.mode];
     let num = 0, den = 0;
     for (const [ch, wt] of [[state.basis, w.trade], ['energy', w.energy], ['crm', w.crm], ['choke', w.choke]]) {
-      const v = series[ch]?.[state.idx];
+      const v = series[ch]?.[i];
       if (v == null || Number.isNaN(v)) continue;
       num += v * wt; den += wt;
     }
     return den > 0 ? num / den : null;
   }
   if (state.kind === 'gpr_source_side' || state.kind === 'intensity_trade') {
-    const v = rec[state.mode]?.[state.idx];
+    const v = rec[state.mode]?.[i];
     return (v == null || Number.isNaN(v)) ? null : v;
   }
-  const p = rec[state.idx];
+  const p = rec[i];
   if (!p) return null;
   const w = state.weights, sum = w.trade + w.energy + w.crm + w.choke || 1;
   const v = (p.trade * w.trade + p.energy * w.energy + p.crm * w.crm + p.choke * w.choke) / sum;
@@ -406,6 +415,45 @@ function populateCountries() {
 
 const CHANNELS = [['trade','Trade'],['energy','Energy'],['crm','Critical raw materials'],['choke','Chokepoint transit']];
 
+/* Country time series. Inline SVG, no library: the panel already re-renders on
+   every month/mix/normalisation change, so this stays in sync for free. Nulls
+   break the path rather than interpolating across gaps. */
+function sparkSVG(iso) {
+  const n = state.months.length, vals = new Array(n);
+  for (let i = 0; i < n; i++) vals[i] = intensityAt(iso, i);
+  const ok = vals.filter(v => v != null);
+  if (ok.length < 2) return '';
+  const W = 268, H = 58, P = 6;
+  const min = Math.min(...ok), max = Math.max(...ok), span = (max - min) || 1;
+  const X = i => P + (i / (n - 1)) * (W - 2 * P);
+  const Y = v => H - P - ((v - min) / span) * (H - 2 * P);
+
+  let d = '', pen = false;
+  for (let i = 0; i < n; i++) {
+    const v = vals[i];
+    if (v == null) { pen = false; continue; }
+    d += (pen ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1) + ' ';
+    pen = true;
+  }
+  // 100 = this country's own 1985-2023 mean; only meaningful on the rebased basis.
+  const ref = (state.mode === 'rebased' && min < 100 && max > 100)
+    ? `<line x1="${P}" y1="${Y(100).toFixed(1)}" x2="${W - P}" y2="${Y(100).toFixed(1)}"
+             stroke="var(--line)" stroke-dasharray="2 3"/>` : '';
+  const cur = vals[state.idx], cx = X(state.idx).toFixed(1);
+  const mark = `<line x1="${cx}" y1="${P}" x2="${cx}" y2="${H - P}" stroke="var(--muted)" opacity=".55"/>`
+    + (cur != null ? `<circle cx="${cx}" cy="${Y(cur).toFixed(1)}" r="2.6" fill="var(--accent)"/>` : '');
+  const f = v => state.mode === 'rebased' ? v.toFixed(0) : v.toFixed(3);
+  const alt = `${NAMES[iso] || iso} Intensity from ${state.months[0]} to ${state.months[n - 1]}, `
+    + `${state.mode} basis: low ${f(min)}, high ${f(max)}, `
+    + `${state.months[state.idx]} ${cur == null ? 'unavailable' : f(cur)}.`;
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${alt}">`
+    + `${ref}<path d="${d.trim()}" fill="none" stroke="var(--accent)" stroke-width="1.3"`
+    + ` stroke-linejoin="round" stroke-linecap="round"/>${mark}</svg>`
+    + `<div class="spark-cap"><span>${state.months[0].slice(0,4)}</span>`
+    + `<span>low ${f(min)} · high ${f(max)}</span>`
+    + `<span>${state.months[n-1].slice(0,4)}</span></div>`;
+}
+
 function detail(iso) {
   const rec = state.data.countries[iso];
   const el = document.getElementById('detail');
@@ -426,6 +474,7 @@ function detail(iso) {
       <h3>${NAMES[iso] || iso}</h3>
       <div class="iso">${iso} · ${state.months[state.idx]} · Intensity (${state.mode}), your channel mix</div>
       <div class="metric"><span><b>Intensity</b></span><b>${total == null ? '—' : (state.mode === 'rebased' ? total.toFixed(1) : total.toFixed(3))}</b></div>
+      ${sparkSVG(iso)}
       ${chRows}
       ${cov != null ? `<div class="metric"><span>Trade observed by GPR</span><b>${(cov*100).toFixed(0)}%</b></div>` : ''}
       ${srcs.length ? `<h2 style="margin-top:14px">Top risk sources (trade, latest month)</h2>` + srcs.map(([j,w,c]) =>
