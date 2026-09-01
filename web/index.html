@@ -21,9 +21,17 @@
 
   .panel{position:absolute;z-index:10;background:rgba(22,27,34,.94);
     border:1px solid var(--line);border-radius:8px;backdrop-filter:blur(8px)}
-  #controls{top:44px;left:16px;width:290px;padding:16px;max-height:calc(100% - 64px);overflow-y:auto}
+  /* Controls and legend share the left edge. They were both absolutely
+     positioned there and overlapped: the legend is anchored to the bottom, so
+     as it grew it covered the last control. One flex column instead — the
+     controls scroll, the legend keeps its natural height, neither can occlude
+     the other however long the text gets. */
+  #left{position:absolute;z-index:10;top:44px;left:16px;bottom:16px;width:290px;
+    display:flex;flex-direction:column;gap:12px;pointer-events:none}
+  #left > *{pointer-events:auto}
+  #controls{position:static;padding:16px;flex:1 1 auto;min-height:0;overflow-y:auto}
   #detail{top:44px;right:16px;width:300px;padding:16px}
-  #legend{bottom:16px;left:16px;padding:12px 14px}
+  #legend{position:static;padding:12px 14px;flex:0 0 auto}
 
   h1{font-size:15px;margin:0 0 2px;letter-spacing:-.01em}
   .sub{font-size:11px;color:var(--muted);margin:0 0 16px;line-height:1.45}
@@ -52,16 +60,16 @@
   .metric b{font-family:var(--mono);font-weight:600;font-size:13px}
   .empty{font-size:12px;color:var(--muted);line-height:1.5}
 
-  .ramp{display:flex;height:9px;width:190px;border-radius:2px;overflow:hidden;margin-bottom:5px}
+  .ramp{display:flex;height:9px;width:100%;border-radius:2px;overflow:hidden;margin-bottom:5px}
   .ramp i{flex:1}
-  .ticks{position:relative;height:13px;width:190px}
+  .ticks{position:relative;height:13px;width:100%}
   .ticks span{position:absolute;transform:translateX(-50%);font-family:var(--mono);
     font-size:9.5px;color:var(--muted);white-space:nowrap}
   .ticks span.anchor{color:var(--ink);font-weight:600}
-  .legend-unit{font-size:10px;color:var(--muted);width:190px;margin-top:3px;line-height:1.4}
+  .legend-unit{font-size:10px;color:var(--muted);width:100%;margin-top:3px;line-height:1.4}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
     clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  .cap{font-size:10px;color:var(--muted);margin-top:8px;max-width:190px;line-height:1.45}
+  .cap{font-size:10px;color:var(--muted);margin-top:8px;max-width:100%;line-height:1.45}
 </style>
 </head>
 <body>
@@ -74,6 +82,7 @@
 <div class="sr-only" id="liveRegion" role="status" aria-live="polite" aria-atomic="true"></div>
 <div class="sr-only" id="srTable"></div>
 
+<div id="left">
 <div class="panel" id="controls">
   <h1>Ribat</h1>
   <p class="sub">A watchpost for geopolitical exposure. Not where risk originates — who bears it. The <b>Intensity</b> index weights country GPR by trade, energy, raw-material and chokepoint dependency. The sliders are your channel mix. <a href="./story.html" style="color:var(--accent)">What does this measure?</a></p>
@@ -115,11 +124,6 @@
     <button id="btnFlat" aria-pressed="false">Flat</button>
   </div>
 </div>
-
-<div class="panel" id="detail">
-  <p class="empty">Select a country to see its exposure decomposition and largest risk-weighted dependencies.</p>
-</div>
-
 <div class="panel" id="legend">
   <div class="ramp" id="ramp"></div>
   <div class="ticks" id="ticks"></div>
@@ -127,6 +131,12 @@
   <p class="cap" id="currency">—</p>
   <p class="cap">Boundaries: Natural Earth (public domain). GPR: Caldara &amp; Iacoviello (2022), CC-BY.</p>
 </div>
+</div>
+
+<div class="panel" id="detail">
+  <p class="empty">Select a country to see its exposure decomposition and largest risk-weighted dependencies.</p>
+</div>
+
 
 <script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
