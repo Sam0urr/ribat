@@ -92,7 +92,8 @@ requests at runtime.
 │   ├── 02_build_weights.py          WITS gross trade weights
 │   ├── 02b_build_channel_weights.py WITS fuels + ores/metals weights
 │   ├── 02c_build_va_weights.py      OECD TiVA value-added weights
-│   └── 03_build_intensity.py        join GPR x weights, export web payload
+│   ├── 03_build_intensity.py        join GPR x weights, export web payload
+│   └── 04_validate.py               discriminant / channel / event-study tests
 └── web/
     ├── data/                    payload + vendored country polygons
     └── index.html               MapLibre front end
@@ -122,6 +123,7 @@ python3 pipeline/02_build_weights.py          # WITS gross trade weights
 python3 pipeline/02b_build_channel_weights.py # energy + raw-material weights
 python3 pipeline/02c_build_va_weights.py      # value-added weights (OECD TiVA)
 python3 pipeline/03_build_intensity.py        # join -> web/data/intensity.json
+python3 pipeline/04_validate.py               # validation report
 ```
 
 `02` fetches 264 WITS responses on first run (~5 min) and caches them under

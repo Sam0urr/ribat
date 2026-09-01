@@ -1,0 +1,77 @@
+Intensity index - validation report
+generated 2026-08-31
+months 1985-01 to 2026-07, 43 economies, channels: choke, crm, energy, trade, va
+
+========================================================================
+T1  DISCRIMINANT VALIDITY - is Intensity just re-plotting GPR?
+========================================================================
+  Pooled Pearson  own-GPR vs Intensity :  0.472
+  Pooled Spearman own-GPR vs Intensity :  0.505
+  Cross-sectional Spearman, mean       :  0.174   (min -0.35, max  0.68, n=91 months)
+
+  Interpretation: values near +1 would mean the exposure weighting is
+  redundant. Values near 0 mean Intensity ranks economies differently
+  from source-side GPR - i.e. it carries information GPR does not.
+
+========================================================================
+T2  CHANNEL DISCRIMINATION - are the sliders decorative?
+========================================================================
+channel  choke    crm  energy  trade     va
+channel                                    
+choke    1.000  0.251   0.221  0.212  0.295
+crm      0.251  1.000   0.738  0.922  0.898
+energy   0.221  0.738   1.000  0.771  0.759
+trade    0.212  0.922   0.771  1.000  0.936
+va       0.295  0.898   0.759  0.936  1.000
+
+  Mean off-diagonal Spearman:  0.600
+  Interpretation: near +1 across the board would mean the channels are
+  the same signal and the mix is cosmetic.
+
+========================================================================
+T3  EVENT STUDIES - pre-registered expectations vs actual top movers
+========================================================================
+
+  2019-09  Abqaiq strike on Saudi oil processing   [channel: energy]
+    expected      : Gulf-dependent oil importers: JPN, KOR, IND, CHN, TWN
+    observed (abs): EGY +66.8, ZAF +45.7, JPN +28.1, KOR +26.9, THA +22.6, IDN +21.2
+    observed (pct): ZAF +75%, EGY +74%, THA +36%, IDN +34%, KOR +34%, JPN +32%
+    median abs move: -0.7 index points
+
+  2022-02  Russian invasion of Ukraine   [channel: energy]
+    expected      : European importers of Russian supply: POL, HUN, DEU, ITA, FIN, TUR
+    observed (abs): FIN +409.3, POL +360.1, SWE +345.7, DNK +339.8, RUS +339.2, NOR +316.8
+    observed (pct): HUN +394%, POL +390%, RUS +353%, FIN +342%, ITA +326%, DNK +318%
+    median abs move: +127.2 index points
+
+  2022-08  Taiwan Strait crisis (Pelosi visit)   [channel: choke]
+    expected      : Economies routing through the Taiwan Strait: JPN, KOR, PHL, EU-Asia traders
+    observed (abs): ZAF +124.4, CHN +109.9, IND +105.7, ISR +90.7, JPN +82.3, KOR +82.0
+    observed (pct): ZAF +124%, HUN +119%, DNK +118%, PRT +116%, NOR +113%, GBR +113%
+    median abs move: +46.3 index points
+
+  2023-10  Israel-Gaza war onset   [channel: choke]
+    expected      : Red Sea corridor users: EU-Asia traders (DEU, NLD, ITA, POL) via EGY littoral
+    observed (abs): SAU +151.1, UKR +135.8, CHE +118.1, GBR +106.0, IND +100.6, DEU +96.9
+    observed (pct): AUS +496%, MYS +256%, THA +249%, PHL +249%, VNM +244%, IDN +237%
+    median abs move: +55.1 index points
+
+  2024-01  Red Sea shipping attacks   [channel: choke]
+    expected      : Same Red Sea corridor, sustained: EU-Asia traders
+    observed (abs): SAU +72.7, IND +71.0, FIN +62.7, CHE +55.5, POL +54.3, GBR +54.2
+    observed (pct): AUS +109%, MYS +85%, BRA +79%, THA +72%, VNM +70%, COL +69%
+    median abs move: +21.6 index points
+
+  2001-09  9/11 [ANACHRONISTIC WEIGHTS]   [channel: trade]
+    expected      : US-dependent economies: CAN, MEX
+    observed (abs): CAN +424.3, MEX +410.7, USA +344.0, BEL +317.3, NOR +307.2, COL +306.4
+    observed (pct): CAN +805%, MEX +775%, BEL +694%, CHE +682%, ISR +678%, FRA +670%
+    median abs move: +270.6 index points
+    WARNING pre-2019 - weights are anachronistic (2019 vintage)
+
+  1990-08  Iraq invades Kuwait [ANACHRONISTIC WEIGHTS]   [channel: energy]
+    expected      : Oil importers exposed to Saudi GPR
+    observed (abs): EGY +579.7, ZAF +383.5, JPN +366.0, KOR +343.9, IND +326.9, THA +287.7
+    observed (pct): EGY +2073%, ZAF +1984%, IND +1184%, IDN +1142%, THA +1072%, JPN +1070%
+    median abs move: +179.7 index points
+    WARNING pre-2019 - weights are anachronistic (2019 vintage)
