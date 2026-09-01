@@ -54,14 +54,25 @@
 
   .ramp{display:flex;height:9px;width:190px;border-radius:2px;overflow:hidden;margin-bottom:5px}
   .ramp i{flex:1}
-  .ticks{display:flex;justify-content:space-between;font-family:var(--mono);
-    font-size:10px;color:var(--muted);width:190px}
+  .ticks{position:relative;height:13px;width:190px}
+  .ticks span{position:absolute;transform:translateX(-50%);font-family:var(--mono);
+    font-size:9.5px;color:var(--muted);white-space:nowrap}
+  .ticks span.anchor{color:var(--ink);font-weight:600}
+  .legend-unit{font-size:10px;color:var(--muted);width:190px;margin-top:3px;line-height:1.4}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0 0 0 0);white-space:nowrap;border:0}
   .cap{font-size:10px;color:var(--muted);margin-top:8px;max-width:190px;line-height:1.45}
 </style>
 </head>
 <body>
 <div class="banner" id="banner">Loading…</div>
 <div id="map"></div>
+
+<!-- Equivalent text alternative to the map canvas. WCAG asks for an equivalent,
+     not for 241 focusable polygons: tabbing through every country would be a
+     hostile screen-reader experience. -->
+<div class="sr-only" id="liveRegion" role="status" aria-live="polite" aria-atomic="true"></div>
+<div class="sr-only" id="srTable"></div>
 
 <div class="panel" id="controls">
   <h1>Ribat</h1>
@@ -70,6 +81,12 @@
   <h2>Period</h2>
   <div class="month" id="monthLabel">—</div>
   <input type="range" id="time" min="0" max="0" value="0" style="width:100%">
+
+  <h2><label for="countrySel">Country</label></h2>
+  <select id="countrySel" style="width:100%;background:var(--panel);color:var(--ink);
+    border:1px solid var(--line);border-radius:6px;padding:6px;font:inherit;font-size:12px">
+    <option value="">Select an economy…</option>
+  </select>
 
   <h2>Normalisation</h2>
   <div class="seg" role="group">
@@ -105,7 +122,8 @@
 
 <div class="panel" id="legend">
   <div class="ramp" id="ramp"></div>
-  <div class="ticks"><span>low</span><span>exposure</span><span>high</span></div>
+  <div class="ticks" id="ticks"></div>
+  <div class="legend-unit" id="legendUnit">—</div>
   <p class="cap">Boundaries: Natural Earth (public domain). GPR: Caldara &amp; Iacoviello (2022), CC-BY.</p>
 </div>
 
@@ -115,7 +133,15 @@
 // ---------------------------------------------------------------------------
 // Colour ramp — sequential, dark-background safe.
 // ---------------------------------------------------------------------------
-const RAMP = ['#123b56','#1b5e73','#3f7f6a','#8a9a4a','#c9973b','#dd6a35','#c9353f'];
+// Single-hue sequential blue, light->dark inverted for a dark surface: the
+// darkest step means "near zero" and recedes into the background. Replaces a
+// rainbow ramp, which is not perceptually uniform, is unsafe for colour-vision
+// deficiency, and imported a red-alert semantic this index does not carry.
+// Lightness is strictly monotonic (0.338 -> 0.905), the applicable check for a
+// sequential ramp. The lowest steps fall below 3:1 against the surface, which
+// is permitted for continuous magnitude only because an equivalent data table
+// is provided below.
+const RAMP = ['#0d366b','#184f95','#1c5cab','#256abf','#3987e5','#6da7ec','#cde2fb'];
 const rampEl = document.getElementById('ramp');
 RAMP.forEach(c => { const i = document.createElement('i'); i.style.background = c; rampEl.appendChild(i); });
 
@@ -269,9 +295,59 @@ map.on('load', async () => {
   map.on('mouseenter', 'fill', () => map.getCanvas().style.cursor = 'pointer');
   map.on('mouseleave', 'fill', () => map.getCanvas().style.cursor = '');
 
+  // The canvas carries no accessible information; the table and live region
+  // above are its text equivalent. tabindex -1 keeps focusable content out of
+  // an aria-hidden subtree (the zoom buttons stay keyboard-reachable).
+  const cv = map.getCanvas();
+  cv.setAttribute('aria-hidden', 'true');
+  cv.setAttribute('tabindex', '-1');
+
+  populateCountries();
   render();
   map.once('idle', render);
 });
+
+const fmtVal = v => v == null ? '—'
+  : (state.mode === 'rebased' ? v.toFixed(0) : v.toFixed(3));
+
+// Break values in the units actually on screen. The scale is NOT 0-100: rebased
+// GPR is anchored at 100 = each country's own 1985-2023 mean and runs far past
+// it, and Intensity has no natural anchor at all (it is a weighted sum of
+// rebased partner series), so it is binned by percentile. See METHODOLOGY 4.
+function legendModel(sorted) {
+  if (state.mode === 'rebased' && state.kind === 'gpr_source_side') {
+    return { breaks: REBASED_BREAKS, anchor: 100,
+             unit: 'GPR index · 100 = country\u2019s own 1985–2023 mean' };
+  }
+  const out = [];
+  for (let i = 1; i < RAMP.length; i++) {
+    const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * i / RAMP.length));
+    out.push(sorted[idx]);
+  }
+  const what = state.kind === 'gpr_source_side' ? 'GPR' : 'Intensity';
+  return { breaks: out, anchor: null,
+           unit: `${what} (${state.mode}) · percentile bins, breaks for ${state.months[state.idx]}` };
+}
+
+function updateLegend(sorted) {
+  const { breaks, anchor, unit } = legendModel(sorted);
+  document.getElementById('ticks').innerHTML = breaks.map((b, i) =>
+    `<span class="${anchor != null && b === anchor ? 'anchor' : ''}" style="left:${(i + 1) / RAMP.length * 100}%">${
+      b == null ? '' : (state.mode === 'rebased' ? Math.round(b) : (+b).toFixed(2))}</span>`).join('');
+  document.getElementById('legendUnit').textContent = unit;
+}
+
+function updateSrTable(rows) {
+  const label = state.kind === 'gpr_source_side' ? 'GPR' : 'Intensity';
+  document.getElementById('srTable').innerHTML =
+    `<table><caption>${label} (${state.mode}) by economy, ${state.months[state.idx]}. `
+    + `${rows.length} economies, ranked highest first.</caption>`
+    + `<thead><tr><th scope="col">Rank</th><th scope="col">Economy</th>`
+    + `<th scope="col">${label}</th></tr></thead><tbody>`
+    + rows.map((r, i) => `<tr><td>${i + 1}</td><th scope="row">${NAMES[r.i] || r.i}</th>`
+        + `<td>${fmtVal(r.v)}</td></tr>`).join('')
+    + `</tbody></table>`;
+}
 
 function render() {
   if (!world) return;
@@ -284,6 +360,10 @@ function render() {
     map.setFeatureState({ source: 'countries', id: f.id }, { colour: v == null ? '#1c222b' : colourFor(bucket(v, sorted)) });
   }
   document.getElementById('monthLabel').textContent = state.months[state.idx] || '—';
+  updateLegend(sorted);
+  updateSrTable(world.features.map(f => f.properties.iso3).filter(Boolean)
+    .map(i => ({ i, v: intensity(i) })).filter(o => o.v != null)
+    .sort((a, b) => b.v - a.v));
   if (state.selected) detail(state.selected);
 }
 
@@ -292,6 +372,21 @@ function select(iso) {
   state.selected = iso;
   map.setFilter('sel', ['==', 'iso3', iso]);
   detail(iso);
+  const sel = document.getElementById('countrySel');
+  if (sel.value !== iso) sel.value = iso;
+  const label = state.kind === 'gpr_source_side' ? 'GPR' : 'Intensity';
+  document.getElementById('liveRegion').textContent =
+    `${NAMES[iso] || iso}, ${state.months[state.idx]}: ${label} (${state.mode}) `
+    + `${fmtVal(intensity(iso))}.`;
+}
+
+function populateCountries() {
+  const sel = document.getElementById('countrySel');
+  const isos = Object.keys(state.data.countries)
+    .sort((a, b) => (NAMES[a] || a).localeCompare(NAMES[b] || b));
+  sel.insertAdjacentHTML('beforeend',
+    isos.map(i => `<option value="${i}">${NAMES[i] || i}</option>`).join(''));
+  sel.addEventListener('change', e => e.target.value && select(e.target.value));
 }
 
 const CHANNELS = [['trade','Trade'],['energy','Energy'],['crm','Critical raw materials'],['choke','Chokepoint transit']];
