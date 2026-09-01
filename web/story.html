@@ -3,127 +3,282 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ribat — what this map measures</title>
-<meta name="description" content="Why a map of where geopolitical risk is reported is not a map of who pays for it.">
+<title>Ribat — the watchpost</title>
+<meta name="description" content="A map of where geopolitical risk is reported is not a map of who pays for it. The Ribat Intensity index measures incidence, not origin.">
+<meta property="og:title" content="Ribat — the watchpost">
+<meta property="og:description" content="Where risk is reported is not who pays for it.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg:#0d1117; --panel:#161b22; --line:#272e38;
-    --ink:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --warn:#d29922;
-    --bar:#256abf; --bar-hi:#6da7ec; --bar-mute:#1c3352;
-    --font:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  }
-  *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);
-    line-height:1.65;-webkit-font-smoothing:antialiased}
+:root{
+  --ink:#070b12; --ink-2:#0c131f;
+  --bone:#ece4d4; --bone-2:#b9b3a6; --muted:#767f8f;
+  --blue:#6da7ec; --blue-mid:#3987e5; --blue-deep:#1c5cab;
+  --amber:#d9a441;
+  --line:rgba(236,228,212,.13); --line-2:rgba(236,228,212,.07);
+  --display:'Fraunces',Georgia,'Times New Roman',serif;
+  --sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --gutter:clamp(20px,5vw,64px);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--ink);color:var(--bone-2);
+  font-family:var(--sans);font-weight:300;line-height:1.68;font-size:17px;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
 
-  a{color:var(--accent)}
-  header{position:sticky;top:0;z-index:30;background:rgba(13,17,23,.92);
-    backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
-  nav{max-width:1100px;margin:0 auto;padding:12px 20px;display:flex;
-    align-items:baseline;gap:18px;flex-wrap:wrap}
-  nav .brand{font-weight:700;letter-spacing:-.01em}
-  nav .spacer{flex:1}
-  nav a{font-size:13px;text-decoration:none}
-  nav a:hover,nav a:focus-visible{text-decoration:underline}
+/* ── atmosphere: a chart-room graticule, a warm horizon, and grain ────── */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 80% at 78% -10%, rgba(41,106,191,.20), transparent 60%),
+    radial-gradient(90% 60% at 8% 105%, rgba(217,164,65,.09), transparent 62%),
+    repeating-linear-gradient(0deg,var(--line-2) 0 1px,transparent 1px 88px),
+    repeating-linear-gradient(90deg,var(--line-2) 0 1px,transparent 1px 88px);
+}
+body::after{
+  content:'';position:fixed;inset:0;z-index:1;pointer-events:none;opacity:.22;
+  mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
+}
+main,header,footer{position:relative;z-index:2}
 
-  .wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+/* ── typography ───────────────────────────────────────────────────────── */
+h1,h2,h3{font-family:var(--display);font-weight:400;color:var(--bone);
+  letter-spacing:-.02em;font-variation-settings:'opsz' 96,'SOFT' 0,'WONK' 1}
+a{color:var(--blue);text-underline-offset:3px;text-decoration-thickness:1px}
+a:hover{color:var(--bone)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--muted)}
+.rule{height:1px;background:var(--line);border:0;margin:0}
 
-  .hero{padding:72px 0 48px;max-width:660px}
-  .hero h1{font-size:clamp(30px,5vw,46px);line-height:1.12;margin:0 0 18px;
-    letter-spacing:-.02em}
-  .hero p{font-size:17px;color:var(--muted);margin:0 0 14px}
-  .hero .lede{color:var(--ink)}
+/* ── header ───────────────────────────────────────────────────────────── */
+header{position:sticky;top:0;z-index:40;
+  background:linear-gradient(180deg,rgba(7,11,18,.94),rgba(7,11,18,.72) 70%,transparent);
+  backdrop-filter:blur(10px)}
+nav{display:flex;align-items:center;gap:26px;padding:16px var(--gutter);
+  border-bottom:1px solid var(--line-2)}
+nav .mark{font-family:var(--display);font-size:19px;color:var(--bone);
+  letter-spacing:.01em;font-variation-settings:'opsz' 40,'WONK' 1}
+nav .mark span{color:var(--amber)}
+nav .sp{flex:1}
+nav a{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;
+  text-transform:uppercase;text-decoration:none;color:var(--muted)}
+nav a:hover{color:var(--bone)}
 
-  /* scrollytelling: sticky figure + scrolling prose */
-  .scrolly{display:grid;grid-template-columns:1fr 1fr;gap:48px;
-    align-items:start;padding-bottom:40px}
-  .figure{position:sticky;top:84px;padding:18px;border:1px solid var(--line);
-    border-radius:10px;background:var(--panel)}
-  .figure h2{font-size:13px;margin:0 0 2px;letter-spacing:-.01em}
-  .figure .sub{font-size:11px;color:var(--muted);margin:0 0 14px;min-height:30px}
+/* ── hero ─────────────────────────────────────────────────────────────── */
+.hero{padding:clamp(80px,14vh,170px) var(--gutter) clamp(60px,10vh,110px);
+  max-width:1220px}
+.hero .eyebrow{display:block;margin-bottom:26px}
+.hero h1{
+  font-size:clamp(38px,7.6vw,104px);line-height:.98;margin:0 0 34px;
+  max-width:16ch;letter-spacing:-.035em;font-weight:300;
+}
+.hero h1 em{font-style:italic;color:var(--amber);font-weight:400}
+.hero .lede{font-size:clamp(17px,2vw,21px);max-width:56ch;color:var(--bone-2);
+  font-weight:300;line-height:1.6}
+.hero .lede strong{color:var(--bone);font-weight:500}
+.scroll-cue{display:flex;align-items:center;gap:12px;margin-top:54px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+  text-transform:uppercase;color:var(--muted)}
+.scroll-cue i{display:block;width:52px;height:1px;background:var(--line);
+  position:relative;overflow:hidden}
+.scroll-cue i::after{content:'';position:absolute;inset:0;background:var(--amber);
+  transform:translateX(-100%);animation:sweep 2.6s ease-in-out infinite}
+@keyframes sweep{0%{transform:translateX(-100%)}55%,100%{transform:translateX(100%)}}
 
-  .bars{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
-  .bars li{display:grid;grid-template-columns:118px 1fr 54px;align-items:center;
-    gap:9px;font-size:12px}
-  .bars .name{color:var(--muted);white-space:nowrap;overflow:hidden;
-    text-overflow:ellipsis}
-  .bars .track{background:#11161d;border-radius:3px;height:15px;overflow:hidden}
-  .bars .fill{background:var(--bar);height:100%;border-radius:3px;width:0;
-    transition:width .5s ease,background-color .3s ease}
-  .bars .val{font-family:var(--mono);font-size:11px;text-align:right;color:var(--ink)}
-  .bars li.hi .name{color:var(--ink);font-weight:600}
-  .bars li.hi .fill{background:var(--bar-hi)}
-  .bars li.dim .fill{background:var(--bar-mute)}
-  .bars li.dim .name,.bars li.dim .val{color:#5b636d}
+.rise{opacity:0;transform:translateY(22px);
+  animation:rise .95s cubic-bezier(.22,.7,.24,1) forwards}
+@keyframes rise{to{opacity:1;transform:none}}
+.d1{animation-delay:.05s}.d2{animation-delay:.18s}
+.d3{animation-delay:.32s}.d4{animation-delay:.5s}
 
-  .steps{display:flex;flex-direction:column;gap:0}
-  .step{min-height:78vh;display:flex;flex-direction:column;justify-content:center;
-    padding:24px 0}
-  .step h3{font-size:22px;margin:0 0 12px;letter-spacing:-.01em}
-  .step p{margin:0 0 14px;color:#c2ccd6}
-  .step p strong{color:var(--ink)}
-  .step .tag{display:inline-block;font-family:var(--mono);font-size:10px;
-    letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
-    border:1px solid var(--line);border-radius:99px;padding:3px 9px;margin-bottom:14px}
-  .step.is-active h3{color:#fff}
+/* ── stat band ────────────────────────────────────────────────────────── */
+.band{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  margin:0 var(--gutter)}
+.band div{padding:26px 8px 26px 0;border-right:1px solid var(--line-2)}
+.band div:last-child{border-right:0}
+.band b{display:block;font-family:var(--display);font-weight:300;
+  font-size:clamp(30px,4vw,46px);color:var(--bone);line-height:1;
+  letter-spacing:-.03em;font-variation-settings:'opsz' 60}
+.band span{display:block;margin-top:9px;font-family:var(--mono);font-size:10.5px;
+  letter-spacing:.13em;text-transform:uppercase;color:var(--muted);line-height:1.6}
 
-  .callout{border-left:2px solid var(--accent);padding:2px 0 2px 16px;
-    color:var(--muted);font-size:14px}
-  .callout.warn{border-left-color:var(--warn)}
+/* ── section furniture ────────────────────────────────────────────────── */
+section.block{padding:clamp(70px,12vh,130px) var(--gutter);max-width:1220px}
+section.block > .eyebrow{display:block;margin-bottom:18px}
+h2{font-size:clamp(28px,4.4vw,54px);line-height:1.04;margin:0 0 22px;
+  max-width:19ch;letter-spacing:-.03em;font-weight:300}
+.prose{max-width:58ch}
+.prose p{margin:0 0 18px}
+.prose strong{color:var(--bone);font-weight:500}
 
-  .outro{padding:56px 0 96px;max-width:660px}
-  .outro h2{font-size:26px;letter-spacing:-.01em;margin:0 0 14px}
-  .outro p{color:#c2ccd6}
-  .cta{display:inline-block;margin-top:10px;background:var(--accent);color:#06101f;
-    font-weight:600;text-decoration:none;padding:11px 20px;border-radius:7px}
-  .cta:hover,.cta:focus-visible{background:#7cb8ff}
-  footer{border-top:1px solid var(--line);padding:26px 0 60px;font-size:12px;
-    color:var(--muted)}
-  footer a{color:var(--muted)}
+.rv{opacity:0;transform:translateY(26px);
+  transition:opacity .9s cubic-bezier(.22,.7,.24,1),transform .9s cubic-bezier(.22,.7,.24,1)}
+.rv.in{opacity:1;transform:none}
 
-  @media (max-width:860px){
-    .scrolly{grid-template-columns:1fr;gap:0}
-    .figure{position:sticky;top:56px;z-index:10;margin-bottom:16px}
-    .step{min-height:auto;padding:28px 0}
-  }
-  @media (prefers-reduced-motion:reduce){
-    html{scroll-behavior:auto}
-    .bars .fill{transition:none}
-  }
+/* ── slope chart ──────────────────────────────────────────────────────── */
+.slope-wrap{margin-top:44px;border:1px solid var(--line);border-radius:3px;
+  background:linear-gradient(180deg,var(--ink-2),rgba(12,19,31,.35));padding:22px;
+  overflow-x:auto}
+.slope-head{display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+#slope{width:100%;min-width:640px;height:auto;display:block}
+#slope .lbl{font-family:var(--sans);font-size:12.5px;fill:var(--bone-2)}
+#slope .lbl.mv{fill:var(--bone);font-weight:500}
+#slope .rk{font-family:var(--mono);font-size:10.5px;fill:var(--muted)}
+#slope path{fill:none;stroke-width:1.4;stroke-linecap:round;
+  stroke-dasharray:var(--len);stroke-dashoffset:var(--len);
+  transition:stroke-dashoffset 1.5s cubic-bezier(.3,.7,.3,1)}
+.in #slope path{stroke-dashoffset:0}
+.slope-note{margin-top:14px;font-size:13.5px;color:var(--muted);max-width:62ch}
+
+/* ── scrollytelling ───────────────────────────────────────────────────── */
+.scrolly{display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1fr);
+  gap:clamp(28px,5vw,72px);align-items:start;
+  padding:0 var(--gutter) clamp(40px,8vh,90px);max-width:1220px}
+.figure{position:sticky;top:96px;border:1px solid var(--line);border-radius:3px;
+  background:linear-gradient(180deg,var(--ink-2),rgba(12,19,31,.4));padding:22px}
+.figure h3{font-size:17px;margin:0 0 3px;letter-spacing:-.01em;font-weight:400}
+.figure .sub{font-family:var(--mono);font-size:10.5px;color:var(--muted);
+  margin:0 0 20px;min-height:32px;line-height:1.55;letter-spacing:.02em}
+.bars{display:flex;flex-direction:column;gap:7px;margin:0;padding:0;list-style:none}
+.bars li{display:grid;grid-template-columns:112px 1fr 56px;align-items:center;
+  gap:11px;font-size:13px}
+.bars .nm{color:var(--bone-2);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.bars .tr{background:rgba(236,228,212,.05);height:16px;border-radius:2px;
+  overflow:hidden}
+.bars .fl{background:linear-gradient(90deg,var(--blue-deep),var(--blue-mid));
+  height:100%;border-radius:2px;width:0;
+  transition:width .65s cubic-bezier(.3,.75,.3,1),background .35s}
+.bars .vl{font-family:var(--mono);font-size:11.5px;text-align:right;color:var(--bone)}
+.bars li.hi .nm{color:var(--bone);font-weight:500}
+.bars li.hi .fl{background:linear-gradient(90deg,var(--amber),#f0c069)}
+.bars li.dim .fl{background:rgba(109,167,236,.2)}
+.bars li.dim .nm,.bars li.dim .vl{color:#5c6474}
+
+.steps{display:flex;flex-direction:column}
+.step{min-height:84vh;display:flex;flex-direction:column;justify-content:center;
+  padding:26px 0}
+.step .num{font-family:var(--mono);font-size:11px;letter-spacing:.2em;
+  color:var(--muted);margin-bottom:16px}
+.step .num b{color:var(--amber);font-weight:400}
+.step h3{font-size:clamp(24px,3.4vw,38px);line-height:1.08;margin:0 0 16px;
+  letter-spacing:-.025em;font-weight:300;color:var(--bone-2);transition:color .5s}
+.step.is-active h3{color:var(--bone)}
+.step p{margin:0 0 15px;max-width:52ch}
+.step strong{color:var(--bone);font-weight:500}
+.pull{border-left:2px solid var(--blue-mid);padding:4px 0 4px 18px;
+  color:var(--muted);font-size:14.5px;margin:22px 0 0;max-width:52ch}
+.pull.warn{border-left-color:var(--amber)}
+.pull b{color:var(--bone);font-weight:500}
+
+/* ── honesty cards ────────────────────────────────────────────────────── */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));
+  gap:1px;background:var(--line);border:1px solid var(--line);margin-top:44px}
+.card{background:var(--ink);padding:28px 24px}
+.card h4{font-family:var(--display);font-size:19px;color:var(--bone);margin:0 0 10px;
+  font-weight:400;letter-spacing:-.01em}
+.card p{font-size:14.5px;margin:0;color:var(--muted);line-height:1.62}
+.card .tick{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+  text-transform:uppercase;margin-bottom:14px;display:block}
+.card.pass .tick{color:var(--blue)}
+.card.fail .tick{color:var(--amber)}
+
+/* ── outro ────────────────────────────────────────────────────────────── */
+.outro{padding:clamp(80px,14vh,150px) var(--gutter);max-width:1220px}
+.outro h2{max-width:15ch}
+.cta{display:inline-flex;align-items:center;gap:14px;margin-top:30px;
+  font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+  text-decoration:none;color:var(--ink);background:var(--bone);
+  padding:15px 26px;border-radius:2px;transition:transform .3s,background .3s}
+.cta:hover{background:var(--amber);color:var(--ink);transform:translateX(5px)}
+footer{border-top:1px solid var(--line);padding:36px var(--gutter) 72px;
+  font-size:12.5px;color:var(--muted);line-height:1.75}
+footer p{max-width:76ch;margin:0 0 10px}
+footer a{color:var(--bone-2)}
+
+@media (max-width:900px){
+  .scrolly{grid-template-columns:1fr;gap:0}
+  .figure{position:sticky;top:60px;z-index:12;margin-bottom:20px}
+  .step{min-height:auto;padding:34px 0}
+  .hero h1{max-width:none}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .rise,.rv{animation:none!important;opacity:1!important;transform:none!important;
+    transition:none!important}
+  .bars .fl,#slope path{transition:none}
+  #slope path{stroke-dashoffset:0}
+  .scroll-cue i::after{animation:none;transform:none}
+}
 </style>
 </head>
 <body>
 
 <header>
-  <nav class="wrap">
-    <span class="brand">Ribat</span>
-    <span class="spacer"></span>
-    <a href="./index.html">Open the map</a>
-    <a href="https://github.com/Sam0urr/ribat/blob/main/METHODOLOGY.md">Methodology</a>
-    <a href="https://github.com/Sam0urr/ribat">Source &amp; data</a>
+  <nav>
+    <span class="mark">Ribat<span>.</span></span>
+    <span class="sp"></span>
+    <a href="./index.html">The map</a>
+    <a href="https://github.com/Sam0urr/ribat/blob/main/METHODOLOGY.md">Method</a>
+    <a href="https://github.com/Sam0urr/ribat">Source</a>
   </nav>
 </header>
 
-<main class="wrap">
+<main>
 
   <section class="hero">
-    <h1>A map of where risk is reported is not a map of who pays for it.</h1>
-    <p class="lede">The standard measure of geopolitical risk counts newspaper
-      articles. It tells you which countries the news is <em>about</em>. That is a
-      different question from which economies actually bear the cost — and the two
-      answers barely overlap.</p>
-    <p>Scroll to see the gap. Every figure below is read live from the same data
-      files the map uses, so nothing here can drift from the pipeline.</p>
+    <span class="eyebrow rise d1">Ribāṭ · a watchpost at the frontier</span>
+    <h1 class="rise d2">Where risk is reported is not <em>who pays for it.</em></h1>
+    <p class="lede rise d3">The standard measure of geopolitical risk counts newspaper
+      articles. It tells you which countries the news is <strong>about</strong>.
+      That is a different question from which economies actually bear the cost —
+      and the two answers barely overlap.</p>
+    <div class="scroll-cue rise d4"><i></i> Scroll</div>
   </section>
 
+  <div class="band rise d4">
+    <div><b id="statEcon">43</b><span>Economies</span></div>
+    <div><b id="statMonths">499</b><span>Monthly observations</span></div>
+    <div><b>4</b><span>Dependency channels</span></div>
+    <div><b>0.17</b><span>Rank correlation with own risk</span></div>
+  </div>
+
+  <!-- ── the argument, as a picture ─────────────────────────────────── -->
+  <section class="block rv" id="slopeSec">
+    <span class="eyebrow">The gap</span>
+    <h2>Same world. Two entirely different answers.</h2>
+    <div class="prose">
+      <p>On the left, the twelve countries the news reports as most at risk. On the
+        right, where each of those countries sits once you ask instead
+        <strong>whose economy is wired to that risk</strong>. Every crossing line
+        is a country whose position changes.</p>
+    </div>
+
+    <div class="slope-wrap">
+      <div class="slope-head"><span>Reported risk · GPR</span><span>Borne risk · Intensity</span></div>
+      <svg id="slope" viewBox="0 0 720 460" role="img"
+           aria-label="Slope chart connecting each country's rank by reported geopolitical risk to its rank by exposure. The lines cross extensively, showing the two rankings are close to unrelated."></svg>
+      <p class="slope-note" id="slopeNote"></p>
+    </div>
+  </section>
+
+  <hr class="rule">
+
+  <!-- ── scrollytelling ─────────────────────────────────────────────── -->
   <div class="scrolly">
 
-    <!-- The figure is a list of labelled values, so its numbers are real text.
-         No separate text alternative is needed: the chart is already readable. -->
+    <!-- Labelled value rows, not a canvas: the numbers are real text, so this
+         figure needs no separate accessible alternative. -->
     <div class="figure" id="figure">
-      <h2 id="figTitle">Loading…</h2>
+      <h3 id="figTitle">Loading…</h3>
       <p class="sub" id="figSub"></p>
       <ol class="bars" id="bars"></ol>
     </div>
@@ -131,207 +286,277 @@
     <div class="steps">
 
       <section class="step" data-step="gpr">
-        <span class="tag">Step 1 · the usual map</span>
-        <h3>Where the risk is</h3>
-        <p>This is the Caldara–Iacoviello Geopolitical Risk index by country, for
-          the latest month available. It is built by counting how often ten
-          anglophone newspapers write about geopolitical threats and acts
-          involving each country, rebased so that <strong>100 is that country's
-          own long-run average</strong>.</p>
-        <p>It is a good measure, it is openly licensed, and versions of this map
-          already exist. It answers one question well: <em>where is the
-          trouble?</em></p>
+        <div class="num">Step <b>01</b> — the usual map</div>
+        <h3>Where the trouble is</h3>
+        <p>This is the Caldara–Iacoviello Geopolitical Risk index by country. It
+          counts how often ten anglophone newspapers write about geopolitical
+          threats and acts involving each country, rebased so that
+          <strong>100 is that country's own long-run average</strong>.</p>
+        <p>It is a good measure, openly licensed, and versions of this map already
+          exist. It answers one question well: <em>where is the trouble?</em></p>
       </section>
 
       <section class="step" data-step="intensity">
-        <span class="tag">Step 2 · the other map</span>
-        <h3>Who actually bears it</h3>
-        <p>Now the same risk, routed through dependency — trade, energy, raw
-          materials and shipping chokepoints. This is the
-          <strong>Intensity</strong> index: not where trouble happens, but whose
-          economy is wired to it.</p>
-        <p>Compare the two lists. They are close to disjoint. Mexico carries high
-          exposure with no domestic instability at all, because most of its trade
-          runs to a United States sitting above its own historical average.</p>
-        <p class="callout">Measured across every month since 2019, the rank
-          correlation between a country's own risk and its exposure is
-          <strong id="statCorr">0.17</strong> — close to unrelated. That gap is
-          the whole reason this project exists.</p>
+        <div class="num">Step <b>02</b> — the other map</div>
+        <h3>Who actually carries it</h3>
+        <p>Now the same risk routed through dependency — trade, energy, raw
+          materials and shipping chokepoints. This is <strong>Intensity</strong>:
+          not where trouble happens, but whose economy is wired to it.</p>
+        <p>Mexico carries heavy exposure with no domestic instability at all,
+          because most of its trade runs to a United States sitting above its own
+          historical average.</p>
+        <p class="pull">Across every month since 2019 the rank correlation between
+          a country's own risk and its exposure is <b>0.17</b> — close to
+          unrelated. That gap is the whole reason this project exists.</p>
       </section>
 
       <section class="step" data-step="level">
-        <span class="tag">Step 3 · the vantage point</span>
+        <div class="num">Step <b>03</b> — the vantage point</div>
         <h3>Whose newspapers?</h3>
         <p>Here is the risk index again without rebasing — raw article shares on a
-          common scale. One country dominates, and it is not a country in
-          crisis.</p>
+          common scale. One country dominates, and it is not a country in crisis.</p>
         <p>The United States tops this list because <strong>American and British
-          newspapers write about the United States</strong>. The index measures
-          how visible a risk is to a Western readership, not how dangerous it is.
+          newspapers write about the United States</strong>. The index measures how
+          visible a risk is to a Western readership, not how dangerous it is.
           Salience is not threat.</p>
-        <p class="callout warn">This is a limitation, not a bug, and weighting by
-          trade does not remove it — Intensity inherits it in full. It is set out
-          in §5.1 of the methodology rather than buried.</p>
+        <p class="pull warn">A limitation, not a bug — and weighting by trade does
+          not remove it. Intensity inherits it in full. It is set out in
+          <b>§5.1</b> of the methodology rather than buried.</p>
       </section>
 
       <section class="step" data-step="ukraine">
-        <span class="tag">Step 4 · does it work?</span>
+        <div class="num">Step <b>04</b> — does it work?</div>
         <h3>February 2022</h3>
         <p>A measure that cannot fail a test is not worth much. So the index is
           scored against episodes where the answer is known in advance, with the
-          expected countries written down <em>before</em> looking at the
-          result.</p>
+          expected countries written down <em>before</em> looking.</p>
         <p>For the invasion of Ukraine the prediction was: European importers of
           Russian energy. The energy channel's largest movers that month were
           <strong>Finland, Poland, Sweden and Denmark</strong> — as written.</p>
       </section>
 
       <section class="step" data-step="fail">
-        <span class="tag">Step 5 · and where it doesn't</span>
+        <div class="num">Step <b>05</b> — and where it doesn't</div>
         <h3>The tests it failed</h3>
         <p>The same procedure failed on shipping chokepoints. The prediction was
           European Red Sea traders; what appeared was a near-uniform rise almost
-          everywhere. The diagnosis was concrete: the routing table wrongly sent
-          South-East Asia–China trade through the Taiwan Strait, and
-          Russia–East Asia trade through Suez.</p>
-        <p>Correcting both changed the results. Even so the chokepoint channel is
-          <strong>still marked provisional</strong>, because a coarse routing
-          table cannot produce the differences a real transit dataset would.</p>
-        <p class="callout warn">The passing and the failing tests both ship in the
-          repository. A measure whose failures are hidden should not be trusted
-          with the ones that pass.</p>
+          everywhere — the signature of a channel carrying one common factor
+          rather than differentiating between economies.</p>
+        <p>The diagnosis was concrete: the routing table wrongly sent South-East
+          Asia–China trade through the Taiwan Strait, and Russia–East Asia trade
+          through Suez. Correcting both changed the results. Even so, that channel
+          is <strong>still marked provisional</strong>.</p>
       </section>
 
     </div>
   </div>
 
+  <hr class="rule">
+
+  <!-- ── honesty ────────────────────────────────────────────────────── -->
+  <section class="block rv">
+    <span class="eyebrow">What the tests said</span>
+    <h2>The failures ship with the successes.</h2>
+    <div class="prose">
+      <p>A measure whose failures are hidden should not be trusted with the ones
+        that pass. All three tests below run from the repository, and their report
+        is committed alongside the data.</p>
+    </div>
+    <div class="cards">
+      <div class="card pass">
+        <span class="tick">Passed</span>
+        <h4>It is not a re-plot</h4>
+        <p>Rank correlation between a country's own risk and its exposure averages
+          0.17 across 91 months. Intensity carries information the source-side
+          index does not.</p>
+      </div>
+      <div class="card fail">
+        <span class="tick">Mixed</span>
+        <h4>One channel barely earns its slider</h4>
+        <p>Raw materials correlates 0.92 with trade, and value-added 0.94. The
+          chokepoint channel discriminates; those two mostly restate gross trade.</p>
+      </div>
+      <div class="card fail">
+        <span class="tick">Failed, then fixed</span>
+        <h4>Three routing errors</h4>
+        <p>The chokepoint event studies missed their pre-registration. Each failure
+          localised a specific, checkable bug in the shipping-route table rather
+          than a vague miscalibration.</p>
+      </div>
+    </div>
+  </section>
+
   <section class="outro">
-    <h2>Now put it to your own question</h2>
-    <p>The map lets you set the channel mix yourself, switch between a country's
-      own historical baseline and a common scale, and compare gross trade against
-      value-added dependency. There is no single correct weighting, so the
-      weighting is yours to move — read the result as a sensitivity analysis
-      rather than a ranking.</p>
+    <span class="eyebrow">The instrument</span>
+    <h2>Now put it to your own question.</h2>
+    <div class="prose">
+      <p>The map lets you set the channel mix yourself, switch between a country's
+        own historical baseline and a common scale, and compare gross trade against
+        value-added dependency. There is no single correct weighting — so the
+        weighting is yours to move. Read the result as a sensitivity analysis
+        rather than a ranking.</p>
+    </div>
     <a class="cta" href="./index.html">Open the map →</a>
   </section>
 
 </main>
 
-<footer class="wrap">
-  <p>Risk data: Caldara, D. &amp; Iacoviello, M. (2022), “Measuring Geopolitical
-    Risk”, <em>American Economic Review</em> 112(4), 1194–1225, CC BY.
-    Dependency weights: UN Comtrade via World Bank WITS, and OECD TiVA.
-    Boundaries: Natural Earth (public domain).</p>
-  <p><a href="https://github.com/Sam0urr/ribat">Source, methodology and
-    replication files</a>.</p>
+<footer>
+  <p><strong style="color:var(--bone-2)">Risk data</strong> — Caldara, D. &amp;
+    Iacoviello, M. (2022), “Measuring Geopolitical Risk”, <em>American Economic
+    Review</em> 112(4), 1194–1225. CC BY.
+    <strong style="color:var(--bone-2)">Dependency weights</strong> — UN Comtrade
+    via World Bank WITS; OECD TiVA.
+    <strong style="color:var(--bone-2)">Boundaries</strong> — Natural Earth,
+    public domain.</p>
+  <p>Every figure on this page is read at load time from the same data files the
+    map uses, so nothing here can drift from the pipeline.
+    <a href="https://github.com/Sam0urr/ribat">Source, methodology and replication files</a>.</p>
 </footer>
 
 <script>
 const NAMES={CAN:'Canada',MEX:'Mexico',USA:'United States',ARG:'Argentina',BRA:'Brazil',CHL:'Chile',COL:'Colombia',PER:'Peru',VEN:'Venezuela',DNK:'Denmark',FIN:'Finland',HUN:'Hungary',NOR:'Norway',POL:'Poland',RUS:'Russia',SWE:'Sweden',UKR:'Ukraine',GBR:'United Kingdom',BEL:'Belgium',FRA:'France',DEU:'Germany',ITA:'Italy',NLD:'Netherlands',PRT:'Portugal',ESP:'Spain',CHE:'Switzerland',EGY:'Egypt',ISR:'Israel',SAU:'Saudi Arabia',ZAF:'South Africa',TUN:'Tunisia',TUR:'Turkey',AUS:'Australia',CHN:'China',HKG:'Hong Kong',JPN:'Japan',KOR:'South Korea',PHL:'Philippines',TWN:'Taiwan',IDN:'Indonesia',IND:'India',MYS:'Malaysia',THA:'Thailand',VNM:'Vietnam'};
-
-// Default channel mix, matching the map's initial slider positions.
 const MIX={trade:55,energy:25,crm:10,choke:10};
-const state={gpr:null,int:null};
+const S={gpr:null,int:null};
 const nm=i=>NAMES[i]||i;
 
-async function boot(){
-  const [g,t]=await Promise.all([
-    fetch('./data/gpr.json').then(r=>r.ok?r.json():null).catch(()=>null),
-    fetch('./data/intensity.json').then(r=>r.ok?r.json():null).catch(()=>null),
-  ]);
-  state.gpr=g; state.int=t;
-  if(!g&&!t){
-    document.getElementById('figTitle').textContent='Figures unavailable';
-    document.getElementById('figSub').textContent=
-      'The data files could not be loaded; the text above still stands on its own.';
-    return;
-  }
-  observe();
-  show('gpr');
-}
-
-// --- data selectors -------------------------------------------------------
+/* ── data selectors ─────────────────────────────────────────────────── */
 function gprRows(mode){
-  if(!state.gpr) return [];
-  const i=state.gpr.months.length-1;
-  return Object.entries(state.gpr.countries)
+  if(!S.gpr) return [];
+  const i=S.gpr.months.length-1;
+  return Object.entries(S.gpr.countries)
     .map(([iso,r])=>({iso,v:r[mode]&&r[mode][i]}))
     .filter(r=>r.v!=null).sort((a,b)=>b.v-a.v);
 }
 function intRows(){
-  if(!state.int) return [];
-  const i=state.int.months.length-1;
-  return Object.keys(state.int.countries).map(iso=>{
-    const s=state.int.countries[iso].rebased||{}; let n=0,d=0;
+  if(!S.int) return [];
+  const i=S.int.months.length-1;
+  return Object.keys(S.int.countries).map(iso=>{
+    const s=S.int.countries[iso].rebased||{}; let n=0,d=0;
     for(const ch of ['trade','energy','crm','choke']){
       const v=s[ch]&&s[ch][i]; if(v==null) continue; n+=v*MIX[ch]; d+=MIX[ch];
     }
     return {iso,v:d?n/d:null};
   }).filter(r=>r.v!=null).sort((a,b)=>b.v-a.v);
 }
-// Change against the mean of the preceding 12 months, in index points. Absolute
-// change, not percent: percent explodes off a near-zero baseline and would rank
-// the least-exposed economies first.
-function movers(monthStr,channel){
-  const d=state.int; if(!d) return [];
-  const i=d.months.indexOf(monthStr); if(i<12) return [];
+/* Absolute change vs the prior 12 months. Not percent: percent explodes off a
+   near-zero baseline and would rank the least-exposed economies first. */
+function movers(month,channel){
+  const d=S.int; if(!d) return [];
+  const i=d.months.indexOf(month); if(i<12) return [];
   return Object.keys(d.countries).map(iso=>{
     const s=d.countries[iso].rebased&&d.countries[iso].rebased[channel];
     if(!s||s[i]==null) return null;
-    const w=s.slice(i-12,i).filter(v=>v!=null);
-    if(!w.length) return null;
+    const w=s.slice(i-12,i).filter(v=>v!=null); if(!w.length) return null;
     return {iso,v:s[i]-w.reduce((a,b)=>a+b,0)/w.length};
   }).filter(Boolean).sort((a,b)=>b.v-a.v);
 }
 
-// --- steps ----------------------------------------------------------------
+/* ── slope chart: the crossings are the argument ────────────────────── */
+function drawSlope(){
+  const g=gprRows('rebased'), it=intRows();
+  if(!g.length||!it.length) return;
+  const iRank=new Map(it.map((r,i)=>[r.iso,i+1]));
+  const rows=g.filter(r=>iRank.has(r.iso)).slice(0,12);
+  if(rows.length<2) return;
+
+  const W=720,H=460,PAD=26,L=200,R=W-200,step=(H-PAD*2)/(rows.length-1);
+  const yL=k=>PAD+k*step;
+  const yR=rank=>PAD+((rank-1)/Math.max(1,it.length-1))*(H-PAD*2);
+
+  let svg='', moved=0;
+  rows.forEach((r,k)=>{
+    const rank=iRank.get(r.iso), y1=yL(k), y2=yR(rank);
+    const isMoved=Math.abs(rank-(k+1))>=4;
+    if(isMoved) moved++;
+    const c=isMoved?'var(--amber)':'rgba(109,167,236,.45)';
+    const d=`M ${L} ${y1} C ${L+140} ${y1}, ${R-140} ${y2}, ${R} ${y2}`;
+    const len=(Math.abs(R-L)+Math.abs(y2-y1))*1.15;
+    svg+=`<path d="${d}" stroke="${c}" opacity="${isMoved?.95:.6}" `
+       + `style="--len:${len.toFixed(0)};transition-delay:${k*70}ms"/>`
+       + `<circle cx="${L}" cy="${y1}" r="2.6" fill="${c}"/>`
+       + `<circle cx="${R}" cy="${y2}" r="2.6" fill="${c}"/>`
+       + `<text class="lbl${isMoved?' mv':''}" x="${L-16}" y="${y1+4}" text-anchor="end">${nm(r.iso)}</text>`
+       + `<text class="rk" x="${L-16}" y="${y1+4}" text-anchor="end" dx="-${Math.max(58,nm(r.iso).length*7.2)}">${k+1}</text>`
+       + `<text class="lbl${isMoved?' mv':''}" x="${R+16}" y="${y2+4}">${nm(r.iso)}</text>`
+       + `<text class="rk" x="${R+16}" y="${y2+4}" dx="${Math.max(58,nm(r.iso).length*7.2)}">${rank}</text>`;
+  });
+  document.getElementById('slope').innerHTML=svg;
+  document.getElementById('slopeNote').textContent=
+    `${moved} of these ${rows.length} most-reported countries move at least four `
+    + `places once exposure is measured instead of origin; those lines are `
+    + `highlighted. Ranks are for ${S.int.months[S.int.months.length-1]}.`;
+}
+
+/* ── scrollytelling figure ──────────────────────────────────────────── */
 const STEPS={
-  gpr:()=>({title:'Geopolitical Risk, by country',
-    sub:'Where risk is reported · rebased, 100 = that country’s own 1985–2023 mean',
-    rows:gprRows('rebased'),fmt:v=>Math.round(v),hi:[]}),
-  intensity:()=>({title:'Intensity — exposure to geopolitical risk',
-    sub:'Who bears it · trade, energy, raw materials and chokepoints combined',
-    rows:intRows(),fmt:v=>Math.round(v),hi:['MEX']}),
-  level:()=>({title:'Geopolitical Risk, unrebased',
-    sub:'Raw share of newspaper articles · common scale, no baseline',
-    rows:gprRows('level'),fmt:v=>v.toFixed(2),hi:['USA']}),
-  ukraine:()=>({title:'Energy channel, February 2022',
-    sub:'Change against the preceding 12 months, in index points',
-    rows:movers('2022-02','energy'),fmt:v=>'+'+Math.round(v),
-    hi:['FIN','POL','SWE','DNK']}),
-  fail:()=>({title:'Chokepoint channel, October 2023',
-    sub:'Near-uniform movement — the failure that exposed the routing bugs',
-    rows:movers('2023-10','choke'),fmt:v=>'+'+Math.round(v),hi:[]}),
+  gpr:()=>({t:'Geopolitical Risk, by country',
+    s:'Where risk is reported · rebased, 100 = that country’s own 1985–2023 mean',
+    rows:gprRows('rebased'),f:v=>Math.round(v),hi:[]}),
+  intensity:()=>({t:'Intensity — exposure to geopolitical risk',
+    s:'Who bears it · trade, energy, raw materials and chokepoints combined',
+    rows:intRows(),f:v=>Math.round(v),hi:['MEX']}),
+  level:()=>({t:'Geopolitical Risk, unrebased',
+    s:'Raw share of newspaper articles · common scale, no baseline',
+    rows:gprRows('level'),f:v=>v.toFixed(2),hi:['USA']}),
+  ukraine:()=>({t:'Energy channel, February 2022',
+    s:'Change against the preceding 12 months, in index points',
+    rows:movers('2022-02','energy'),f:v=>'+'+Math.round(v),hi:['FIN','POL','SWE','DNK']}),
+  fail:()=>({t:'Chokepoint channel, October 2023',
+    s:'Near-uniform movement — the failure that exposed the routing bugs',
+    rows:movers('2023-10','choke'),f:v=>'+'+Math.round(v),hi:[]}),
 };
 
 function show(key){
-  const build=STEPS[key]; if(!build) return;
-  const {title,sub,rows,fmt,hi}=build();
-  document.getElementById('figTitle').textContent=title;
-  document.getElementById('figSub').textContent=sub;
-  const top=rows.slice(0,10);
-  const max=top.length?Math.max(...top.map(r=>r.v)):1;
+  const b=STEPS[key]; if(!b) return;
+  const {t,s,rows,f,hi}=b();
+  document.getElementById('figTitle').textContent=t;
+  document.getElementById('figSub').textContent=s;
+  const top=rows.slice(0,10), max=top.length?Math.max(...top.map(r=>r.v)):1;
   document.getElementById('bars').innerHTML=top.map(r=>{
     const cls=hi.length?(hi.includes(r.iso)?'hi':'dim'):'';
-    return `<li class="${cls}"><span class="name">${nm(r.iso)}</span>`
-      +`<span class="track"><span class="fill" style="width:${Math.max(2,r.v/max*100)}%"></span></span>`
-      +`<span class="val">${fmt(r.v)}</span></li>`;
+    return `<li class="${cls}"><span class="nm">${nm(r.iso)}</span>`
+      +`<span class="tr"><span class="fl" style="width:${Math.max(2,r.v/max*100)}%"></span></span>`
+      +`<span class="vl">${f(r.v)}</span></li>`;
   }).join('');
 }
 
-// Native IntersectionObserver: this needs no scrollytelling library.
+/* Native IntersectionObserver — no scrollytelling library needed. */
 function observe(){
   const steps=[...document.querySelectorAll('.step')];
-  const io=new IntersectionObserver(entries=>{
-    entries.forEach(e=>{
-      if(!e.isIntersecting) return;
-      steps.forEach(s=>s.classList.toggle('is-active',s===e.target));
-      show(e.target.dataset.step);
-    });
-  },{rootMargin:'-45% 0px -45% 0px',threshold:0});
+  const io=new IntersectionObserver(es=>es.forEach(e=>{
+    if(!e.isIntersecting) return;
+    steps.forEach(s=>s.classList.toggle('is-active',s===e.target));
+    show(e.target.dataset.step);
+  }),{rootMargin:'-45% 0px -45% 0px',threshold:0});
   steps.forEach(s=>io.observe(s));
+
+  const rio=new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting){e.target.classList.add('in'); rio.unobserve(e.target);}
+  }),{rootMargin:'0px 0px -12% 0px',threshold:.12});
+  document.querySelectorAll('.rv').forEach(el=>rio.observe(el));
 }
 
+async function boot(){
+  const [g,t]=await Promise.all([
+    fetch('./data/gpr.json').then(r=>r.ok?r.json():null).catch(()=>null),
+    fetch('./data/intensity.json').then(r=>r.ok?r.json():null).catch(()=>null),
+  ]);
+  S.gpr=g; S.int=t;
+  if(!g&&!t){
+    document.getElementById('figTitle').textContent='Figures unavailable';
+    document.getElementById('figSub').textContent=
+      'The data files could not be loaded; the argument above stands without them.';
+    return;
+  }
+  if(t){
+    document.getElementById('statEcon').textContent=Object.keys(t.countries).length;
+    document.getElementById('statMonths').textContent=t.months.length;
+  }
+  drawSlope();
+  observe();
+  show('gpr');
+}
 boot();
 </script>
 </body>
