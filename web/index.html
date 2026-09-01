@@ -496,11 +496,18 @@ function stackSVG(iso) {
     totals[i] = tot;
   }
 
+  // Normalise each month to its own total: this is a composition chart, not a
+  // level chart. The series above already carries the level, and keeping it here
+  // made the bands unreadable - the spikes dominated the composition.
+  for (let i = 0; i < n; i++) {
+    if (totals[i] == null || totals[i] <= 0) { totals[i] = null; continue; }
+    chans.forEach((_, c) => { if (contrib[c][i] != null) contrib[c][i] /= totals[i]; });
+  }
   const ok = totals.filter(v => v != null);
   if (ok.length < 2) return '';
-  const W = 268, H = 62, P = 5, max = Math.max(...ok) || 1;
+  const W = 268, H = 62, P = 5;
   const X = i => P + (i / (n - 1)) * (W - 2 * P);
-  const Y = v => H - P - (v / max) * (H - 2 * P);
+  const Y = v => H - P - v * (H - 2 * P);            // v is a share in [0,1]
   const COL = ['#184f95', '#256abf', '#3987e5', '#6da7ec'];
 
   const cum = new Array(n).fill(0);
@@ -528,16 +535,17 @@ function stackSVG(iso) {
   const mark = `<line x1="${cx}" y1="${P}" x2="${cx}" y2="${H - P}" stroke="var(--ink)" opacity=".5"/>`;
   const t = totals[state.idx];
   const shares = t ? chans.map(([ch, wt, lbl], c) =>
-      contrib[c][state.idx] == null ? null : `${lbl} ${Math.round(contrib[c][state.idx] / t * 100)}%`)
+      contrib[c][state.idx] == null ? null : `${lbl} ${Math.round(contrib[c][state.idx] * 100)}%`)
     .filter(Boolean).join(', ') : 'no data';
   const alt = `Channel composition of ${NAMES[iso] || iso} Intensity, ${state.months[0]} to `
     + `${state.months[n - 1]}. At ${state.months[state.idx]}: ${shares}.`;
 
   return `<svg class="stack" viewBox="0 0 ${W} ${H}" role="img" aria-label="${alt}">${bands}${mark}</svg>`
     + `<div class="stack-key">${key}</div>`
-    + (rescaled ? `<p class="cap">Bands rescale in ${rescaled} of ${n} months where a channel has no `
-        + `data: the mix is renormalised over the channels present, so a band can widen for a coverage `
-        + `reason rather than an exposure one.</p>` : '');
+    + `<p class="cap">Share of Intensity, 0-100%. The level is in the series above.`
+    + (rescaled ? ` Bands also rescale in ${rescaled} of ${n} months where a channel has no data, so a `
+        + `band can widen for a coverage reason rather than an exposure one.` : '')
+    + `</p>`;
 }
 
 function detail(iso) {
