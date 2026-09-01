@@ -270,6 +270,16 @@ where it applies, the not-a-forecast caution and the citation as text inside
 the figure. A chart that travels without its caveats is the failure mode §5
 exists to prevent, so the figure is self-describing or it is not shipped.
 
+The cross-section is also available as **GeoJSON**, built from the boundary
+features the map already holds, so no second copy of the geometry ships and the
+polygons are exactly those on screen. Properties reuse the CSV column names.
+Two deviations are deliberate: attribution is repeated on every feature, because
+RFC 7946 parsers may drop the top-level `metadata` member and losing the licence
+line is not a cosmetic failure; and economies that Natural Earth carries as
+several features (Australia) are merged into one MultiPolygon, so a join cannot
+double-count them. There is no GeoJSON time series — the same polygon repeated
+across 500 months is not a useful artefact.
+
 **Why `covered_choke` is always empty.** For trade, value added, energy and raw
 materials, `covered_*` is the share of that channel's *denominator* observed by
 the GPR-44 source set — a genuine fraction of a measured flow. The chokepoint
