@@ -170,6 +170,20 @@ def main() -> int:
     check("covered_choke is intentionally empty" in html,
           "export header explains why chokepoint coverage is blank")
 
+    # A chart leaves with no stylesheet and no sibling markup, so the figure has
+    # to carry its own colours, key, caption and attribution or it travels as an
+    # unsourced picture.
+    check("function chartFigure(" in html and "image/svg+xml" in html,
+          "index.html: chart SVG export present")
+    check('xmlns="http://www.w3.org/2000/svg"' in html,
+          "chart export emits a standalone SVG namespace")
+    check("replace(/var\\(--([a-z]+)\\)/g" in html,
+          "chart export resolves CSS custom properties to literals")
+    check("body += t(PAD, y, CITATION" in html or "wrapText(CITATION" in html,
+          "chart export burns in the Caldara-Iacoviello citation")
+    check("not a forecast" in html,
+          "chart export burns in the not-a-forecast caution")
+
     # ── result --------------------------------------------------------------
     print()
     for w in WARN:

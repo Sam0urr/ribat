@@ -261,6 +261,15 @@ not-a-forecast caution, and the Caldara–Iacoviello CC-BY citation. Attribution
 is a licence obligation, not a courtesy; `ribat-verify` fails if the header is
 stripped.
 
+The two panel charts — the Intensity series and the channel decomposition —
+export as standalone SVG. The page styles them with CSS custom properties and
+puts their key and caption in sibling elements, none of which survive the file
+leaving the page, so the export resolves the variables to literals and redraws
+the key, the normalisation, the weight-vintage rule, the stale-weight warning
+where it applies, the not-a-forecast caution and the citation as text inside
+the figure. A chart that travels without its caveats is the failure mode §5
+exists to prevent, so the figure is self-describing or it is not shipped.
+
 **Why `covered_choke` is always empty.** For trade, value added, energy and raw
 materials, `covered_*` is the share of that channel's *denominator* observed by
 the GPR-44 source set — a genuine fraction of a measured flow. The chokepoint

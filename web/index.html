@@ -63,6 +63,10 @@
   .spark-cap{display:flex;justify-content:space-between;font-family:var(--mono);
     font-size:9.5px;color:var(--muted);margin:0 0 12px;letter-spacing:.02em}
   @media (prefers-reduced-motion:no-preference){.spark path{transition:d .15s linear}}
+  .chartdl-row{display:flex;justify-content:flex-end;margin-top:3px}
+  .chartdl{background:none;border:1px solid var(--line);border-radius:5px;color:var(--muted);
+    font:inherit;font-size:9px;padding:2px 7px;cursor:pointer}
+  .chartdl:hover{border-color:var(--accent);color:var(--accent)}
   #dlSection{margin-top:18px}
   .dl{display:flex;flex-direction:column;gap:6px;margin-top:6px}
   .dl button{background:none;border:1px solid var(--line);border-radius:6px;color:var(--ink);
@@ -584,14 +588,16 @@ function detail(iso) {
         const v = rec[state.mode]?.[ch]?.[state.idx];
         return `<div class="metric"><span>${lbl}</span><b>${v == null ? '—' : (state.mode === 'rebased' ? v.toFixed(0) : v.toFixed(3))}</b></div>`;
       }).join('');
+    const sparkHTML = sparkSVG(iso);
     const stackHTML = stackSVG(iso);
+    const chartDl = w => `<div class="chartdl-row"><button class="chartdl" type="button" data-chart="${w}">Download SVG</button></div>`;
     el.innerHTML = `
       <h3>${NAMES[iso] || iso}</h3>
       <div class="iso">${iso} · ${state.months[state.idx]} · Intensity (${state.mode}), your channel mix</div>
       <div class="metric"><span><b>Intensity</b></span><b>${total == null ? '—' : (state.mode === 'rebased' ? total.toFixed(1) : total.toFixed(3))}</b></div>
-      ${sparkSVG(iso)}
+      ${sparkHTML}${sparkHTML ? chartDl('spark') : ''}
       ${chRows}
-      ${stackHTML ? `<h2 style="margin-top:16px">Channel decomposition</h2>` + stackHTML : ''}
+      ${stackHTML ? `<h2 style="margin-top:16px">Channel decomposition</h2>` + stackHTML + chartDl('stack') : ''}
       ${cov != null ? `<div class="metric"><span>Trade observed by GPR</span><b>${(cov*100).toFixed(0)}%</b></div>` : ''}
       ${srcs.length ? `<h2 style="margin-top:14px">Top risk sources (trade, latest month)</h2>` + srcs.map(([j,w,c]) =>
         `<div class="metric"><span>${NAMES[j] || j} <span style="color:var(--muted)">· ${(w*100).toFixed(1)}% of trade</span></span><b>${c.toFixed(0)}</b></div>`).join('') : ''}
@@ -769,6 +775,117 @@ function syncExportUI() {
   sec.style.display = (!state.placeholder && state.kind === 'intensity_multi') ? '' : 'none';
   document.getElementById('dlSeries').disabled = !state.selected;
 }
+
+/* Chart export. The panel SVGs are styled by the page: CSS custom properties
+   for colour, sibling <div>s for the key and the caption. A file sitting on
+   someone's desktop has none of that, so the export resolves the variables to
+   literals and redraws the key, the caption, the normalisation and the
+   attribution as SVG text. A chart that travels without its caveats is exactly
+   the failure mode this index is built against (METHODOLOGY.md 5.1-5.5). */
+const xesc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+function wrapText(s, per) {
+  const out = []; let cur = '';
+  for (const w of String(s).split(/\s+/)) {
+    if (cur && (cur + ' ' + w).length > per) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+function chartFigure(which) {
+  const iso = state.selected;
+  if (!iso) return null;
+  const node = document.querySelector('#detail svg.' + which);
+  if (!node) return null;
+
+  const cs = getComputedStyle(document.documentElement);
+  const V = n => cs.getPropertyValue('--' + n).trim();
+  const CW = 268, PAD = 12, W = CW + PAD * 2;
+  const CH = parseFloat(node.getAttribute('viewBox').split(/\s+/)[3]);
+  const inner = node.outerHTML
+    .replace(/var\(--([a-z]+)\)/g, (_, n) => V(n))
+    .replace(/^<svg /, '<svg width="' + CW + '" height="' + CH + '" ');
+
+  const t = (x, y, str, size, fill, extra) =>
+    '<text x="' + x + '" y="' + y.toFixed(1) + '" font-size="' + size + '" fill="' + fill + '"'
+    + (extra || '') + '>' + xesc(str) + '</text>';
+
+  const heading = which === 'spark' ? 'Intensity' : 'Channel composition';
+  const last = state.months[state.months.length - 1];
+  let y = PAD + 9, body = '';
+  body += t(PAD, y, (NAMES[iso] || iso) + ' — ' + heading, 11, V('ink'), ' font-weight="600"');
+  y += 10.5;
+  body += t(PAD, y, iso + ' · ' + state.months[0] + ' to ' + last + ' · ' + state.mode
+    + ' · marker at ' + state.months[state.idx], 7, V('muted'));
+  y += 10;
+
+  const chartY = y;
+  y += CH + 10;
+
+  if (which === 'spark') {
+    const parts = [...document.querySelectorAll('#detail .spark-cap span')].map(e => e.textContent.trim());
+    body += t(PAD, y, parts[0] || '', 7, V('muted'));
+    body += t(W / 2, y, parts[1] || '', 7, V('muted'), ' text-anchor="middle"');
+    body += t(W - PAD, y, parts[2] || '', 7, V('muted'), ' text-anchor="end"');
+    y += 12;
+  } else {
+    let x = PAD, rows = 0;
+    for (const sp of document.querySelectorAll('#detail .stack-key span')) {
+      const sw = sp.querySelector('i'), lbl = sp.textContent.trim();
+      const wpx = lbl.length * 3.8 + 14;
+      if (x + wpx > W - PAD) { x = PAD; rows++; }
+      const yy = y + rows * 10;
+      body += '<rect x="' + x + '" y="' + (yy - 5).toFixed(1) + '" width="6" height="6" rx="1" fill="'
+        + (sw ? getComputedStyle(sw).backgroundColor : V('accent')) + '"/>' + t(x + 9, yy, lbl, 7, V('muted'));
+      x += wpx;
+    }
+    y += rows * 10 + 12;
+  }
+
+  const panelCap = which === 'stack'
+    ? (document.querySelector('#detail .cap') || {}).textContent : '';
+  const caps = [panelCap,
+    state.mode === 'rebased'
+      ? 'Rebased: each source country indexed to its own 1985-2023 mean = 100.'
+      : 'Level: channel-weighted GPR in raw units.',
+    'Weights are lagged benchmark-year dependency shares (METHODOLOGY.md 5.3).',
+    state.data.stale_weights?.[iso]
+      ? 'Stopped reporting after ' + state.data.stale_weights[iso]
+        + '; weights carried forward and increasingly unrepresentative.' : '',
+    'Contemporaneous measure of reported exposure, not a forecast. The channel mix is a sensitivity analysis, not a ranking.',
+  ].filter(Boolean);
+  for (const c of caps) for (const line of wrapText(c.trim(), 76)) { body += t(PAD, y, line, 6.3, V('muted')); y += 7.8; }
+
+  y += 3;
+  body += t(PAD, y, 'Ribat · ' + (location.host || 'sam0urr.github.io') + ' · downloaded '
+    + new Date().toISOString().slice(0, 10), 6.3, V('muted'));
+  for (const line of wrapText(CITATION, 80)) { y += 7.8; body += t(PAD, y, line, 6.3, V('muted')); }
+  y += PAD;
+
+  const H = Math.ceil(y);
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + W * 2 + '" height="' + H * 2
+    + '" viewBox="0 0 ' + W + ' ' + H + '" font-family="' + V('font').replace(/"/g, "'")
+    + '" role="img" aria-label="' + xesc(node.getAttribute('aria-label') || '') + '">'
+    + '<title>' + xesc((NAMES[iso] || iso) + ' — ' + heading + ', ' + state.months[0] + ' to ' + last) + '</title>'
+    + '<rect width="' + W + '" height="' + H + '" fill="' + V('panel') + '"/>'
+    + '<g transform="translate(' + PAD + ' ' + chartY.toFixed(1) + ')">' + inner + '</g>'
+    + body + '</svg>\n';
+  return { svg, name: 'ribat_' + iso + '_' + (which === 'spark' ? 'intensity' : 'composition')
+    + '_' + state.months[state.idx] + '.svg' };
+}
+
+function exportChart(which) {
+  const fig = chartFigure(which);
+  if (fig) saveFile(fig.name, fig.svg, 'image/svg+xml');
+}
+
+/* The panel is rebuilt with innerHTML on every render, so per-button handlers
+   would not survive; delegate from the container instead. */
+document.getElementById('detail').addEventListener('click', e => {
+  const b = e.target.closest('[data-chart]');
+  if (b) exportChart(b.dataset.chart);
+});
 
 function setFmt(f) {
   state.exportFmt = f;
