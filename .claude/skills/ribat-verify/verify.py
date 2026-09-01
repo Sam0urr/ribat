@@ -151,6 +151,25 @@ def main() -> int:
         ok = f.exists() and "Caldara" in f.read_text(encoding="utf-8")
         check(ok, f"{fname} present with Caldara-Iacoviello attribution")
 
+    # 7 ── export contract ---------------------------------------------------
+    # A downloaded CSV leaves the interface and loses every caveat the panels
+    # carry, so the header block is the only thing standing between the file
+    # and a misreading. These checks fail the build if it is stripped.
+    section("export contract")
+    idx = ROOT / "web" / "index.html"
+    html = idx.read_text(encoding="utf-8") if idx.exists() else ""
+    check("function toCSV(" in html and "URL.createObjectURL" in html,
+          "index.html: export machinery present")
+    check("Caldara" in html and "CC-BY" in html.split("const CITATION")[-1][:400],
+          "export header carries the Caldara-Iacoviello CC-BY citation")
+    for key in ("downloaded", "normalisation", "channel_mix", "coverage", "caution"):
+        check(f"['{key}'," in html, f"export header declares '{key}'")
+    for ch in ("trade", "va", "energy", "crm", "choke"):
+        check(f"'{ch}'" in html.split("EXPORT_CHANNELS = [")[-1][:80],
+              f"export columns cover channel '{ch}'")
+    check("covered_choke is intentionally empty" in html,
+          "export header explains why chokepoint coverage is blank")
+
     # ── result --------------------------------------------------------------
     print()
     for w in WARN:

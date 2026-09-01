@@ -238,6 +238,40 @@ Intensity is a contemporaneous measure of reported exposure. Neither predicts.
 
 ---
 
+## 6. Export contract
+
+The interface offers two downloads: a **cross-section** (every exposed economy
+at the selected month) and a **time series** (one economy, all months), in CSV
+or JSON. Both share one column set, so the two shapes cannot drift apart:
+
+`iso3, name, month, intensity, c_trade, c_va, c_energy, c_crm, c_choke,
+covered_trade, covered_va, covered_energy, covered_crm, covered_choke,
+weights_stale`
+
+`intensity` is the mixed index under the channel weights and normalisation in
+force when the file was written; `c_*` are the per-channel components *before*
+the mix, so a reader can re-derive `intensity` or re-weight it themselves.
+
+A downloaded file leaves this interface and loses every caveat the panels
+carry, so each one opens with a header block (`#`-prefixed lines in CSV, a
+`meta` object in JSON) restating: the normalisation, the trade basis, the
+channel mix actually applied, the data vintage and download date, the
+lagged-benchmark weight rule, the coverage semantics below, the
+not-a-forecast caution, and the Caldara–Iacoviello CC-BY citation. Attribution
+is a licence obligation, not a courtesy; `ribat-verify` fails if the header is
+stripped.
+
+**Why `covered_choke` is always empty.** For trade, value added, energy and raw
+materials, `covered_*` is the share of that channel's *denominator* observed by
+the GPR-44 source set — a genuine fraction of a measured flow. The chokepoint
+weight has no such denominator: it is a routing indicator derived from a coarse
+hand-coded route table (§3.4), not a share of observed trade. Emitting a number
+in that column would invite a comparison the construction does not support, so
+the column is written blank and the header states the reason. The channel
+understates by construction, most severely at Hormuz, whose true littorals are
+almost entirely outside the GPR set. This is a documented absence, not a gap in
+the pipeline.
+
 ## 6. Attribution
 
 GPR data are open access under Creative Commons BY. Required citation:

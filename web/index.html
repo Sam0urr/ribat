@@ -63,6 +63,12 @@
   .spark-cap{display:flex;justify-content:space-between;font-family:var(--mono);
     font-size:9.5px;color:var(--muted);margin:0 0 12px;letter-spacing:.02em}
   @media (prefers-reduced-motion:no-preference){.spark path{transition:d .15s linear}}
+  #dlSection{margin-top:18px}
+  .dl{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+  .dl button{background:none;border:1px solid var(--line);border-radius:6px;color:var(--ink);
+    font:inherit;font-size:11px;padding:7px 8px;cursor:pointer;text-align:left}
+  .dl button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  .dl button:disabled{color:var(--muted);cursor:not-allowed;opacity:.55}
   .metric{display:flex;justify-content:space-between;align-items:baseline;
     padding:7px 0;border-bottom:1px solid var(--line);font-size:12px}
   .metric:last-child{border-bottom:0}
@@ -132,6 +138,19 @@
     <button id="btnGlobe" aria-pressed="true">Globe</button>
     <button id="btnFlat" aria-pressed="false">Flat</button>
   </div>
+
+  <div id="dlSection">
+    <h2>Download</h2>
+    <div class="seg" role="group" aria-label="Export format">
+      <button id="btnCSV" aria-pressed="true">CSV</button>
+      <button id="btnJSON" aria-pressed="false">JSON</button>
+    </div>
+    <div class="dl">
+      <button id="dlCross" type="button">This month, all economies</button>
+      <button id="dlSeries" type="button" disabled>Selected economy, all months</button>
+    </div>
+    <p class="note">Each file carries the view state that produced it, a coverage qualifier per channel, and the CC-BY citation. Chokepoint coverage is blank by construction — the file header says why.</p>
+  </div>
 </div>
 <div class="panel" id="legend">
   <div class="ramp" id="ramp"></div>
@@ -173,7 +192,7 @@ const colourFor = t => RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.floor(t *
 const state = {
   months: [], idx: 0, mode: 'rebased', selected: null,
   weights: { trade: 55, energy: 25, crm: 10, choke: 10 },
-  data: null, placeholder: true, kind: 'intensity', basis: 'trade'
+  data: null, placeholder: true, kind: 'intensity', basis: 'trade', exportFmt: 'csv'
 };
 
 // ---------------------------------------------------------------------------
@@ -378,6 +397,7 @@ function updateSrTable(rows) {
 }
 
 function render() {
+  syncExportUI();
   if (!world) return;
   const sorted = world.features
     .map(f => f.properties.iso3 && intensity(f.properties.iso3))
@@ -634,6 +654,132 @@ const NOTES = {
   rebased: 'Each source country indexed to its own 1985–2023 mean = 100. Detects deterioration; understates chronically high-risk states.',
   level:   'Raw article shares on a common scale. Comparable across countries; dominated by persistent level differences.'
 };
+// ---------------------------------------------------------------------------
+// Export. A CSV that leaves this page loses every caveat the interface
+// carries, so each file restates them: the view state that produced it, a
+// coverage qualifier per channel, the stale-weight flag, and the CC-BY
+// attribution with a download date. Column names follow METHODOLOGY.md so the
+// export and the contract cannot drift apart.
+// ---------------------------------------------------------------------------
+const EXPORT_CHANNELS = ['trade', 'va', 'energy', 'crm', 'choke'];
+const EXPORT_COLS = ['iso3', 'name', 'month', 'intensity']
+  .concat(EXPORT_CHANNELS.map(c => 'c_' + c))
+  .concat(EXPORT_CHANNELS.map(c => 'covered_' + c))
+  .concat(['weights_stale']);
+const CITATION = 'Caldara, Dario and Matteo Iacoviello (2022), "Measuring Geopolitical Risk", American Economic Review 112(4), 1194-1225. GPR data licensed CC-BY.';
+
+/* Sliders are renormalised before use, so record the weights actually applied
+   rather than the raw slider positions. */
+function mixShares() {
+  const w = state.weights;
+  const pairs = [[state.basis, w.trade], ['energy', w.energy], ['crm', w.crm], ['choke', w.choke]];
+  const tot = pairs.reduce((a, kv) => a + kv[1], 0);
+  return pairs.map(kv => kv[0] + '=' + (tot > 0 ? kv[1] / tot : 0).toFixed(4)).join(' ');
+}
+
+function exportMeta(scope) {
+  const d = state.data;
+  return [
+    ['dataset', 'Ribat - Intensity: geopolitical risk borne, not emitted'],
+    ['scope', scope],
+    ['normalisation', state.mode === 'rebased'
+      ? 'rebased - each source country indexed to its own 1985-2023 mean = 100'
+      : 'level - channel-weighted GPR, raw units'],
+    ['trade_basis', state.basis === 'va'
+      ? 'value added (OECD TiVA FDVA, foreign-sourced only)'
+      : 'gross bilateral goods trade (WITS / UN Comtrade)'],
+    ['channel_mix', mixShares() + ' (renormalised per row over the channels present)'],
+    ['data_through', d.months[d.months.length - 1]],
+    ['built', d.generated || 'unknown'],
+    ['downloaded', new Date().toISOString().slice(0, 10)],
+    ['source_url', location.href.split('#')[0]],
+    ['citation', CITATION],
+    ['weights', 'Lagged benchmark-year dependency shares; each month uses the latest benchmark strictly before it (METHODOLOGY.md 5.3). weights_stale gives the last year an economy reported, where it stopped.'],
+    ['coverage', 'covered_* is the share of that channel\'s denominator observed by the GPR-44 source set. Below ~0.70 the channel understates exposure. covered_choke is intentionally empty: the chokepoint weight is a routing indicator, not a share of observed flow, so no comparable coverage share exists - that channel understates by construction, most severely at Hormuz (METHODOLOGY.md 3.4).'],
+    ['caution', 'Contemporaneous measure of reported exposure. Neither GPR nor Intensity is a forecast. The channel mix is a sensitivity analysis, not a ranking.'],
+  ];
+}
+
+function exportRow(iso, i) {
+  const rec = state.data.countries[iso];
+  const series = rec[state.mode] || {};
+  const num = x => (x == null || Number.isNaN(x)) ? ''
+    : (state.mode === 'rebased' ? x.toFixed(2) : x.toFixed(6));
+  const row = { iso3: iso, name: NAMES[iso] || iso, month: state.months[i],
+                intensity: num(intensityAt(iso, i)) };
+  for (const ch of EXPORT_CHANNELS) row['c_' + ch] = num(series[ch] ? series[ch][i] : null);
+  for (const ch of EXPORT_CHANNELS) {
+    const c = rec.covered ? rec.covered[ch] : null;
+    row['covered_' + ch] = c == null ? '' : c.toFixed(3);
+  }
+  const st = state.data.stale_weights ? state.data.stale_weights[iso] : null;
+  row.weights_stale = st == null ? '' : String(st);
+  return row;
+}
+
+const csvCell = v => /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+
+function toCSV(rows, scope) {
+  const head = exportMeta(scope).map(kv => '# ' + kv[0] + ': ' + kv[1]).join('\n');
+  const body = [EXPORT_COLS.join(',')].concat(
+    rows.map(r => EXPORT_COLS.map(c => csvCell(String(r[c] == null ? '' : r[c]))).join(',')));
+  return head + '\n#\n' + body.join('\n') + '\n';
+}
+
+function toJSON(rows, scope) {
+  const meta = {};
+  for (const kv of exportMeta(scope)) meta[kv[0]] = kv[1];
+  return JSON.stringify({ meta: meta, columns: EXPORT_COLS, rows: rows }, null, 2);
+}
+
+function saveFile(name, text, mime) {
+  const url = URL.createObjectURL(new Blob([text], { type: mime + ';charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  document.getElementById('liveRegion').textContent = 'Downloaded ' + name + '.';
+}
+
+function doExport(which) {
+  let rows, scope, stem;
+  const last = state.months[state.months.length - 1];
+  if (which === 'cross') {
+    const month = state.months[state.idx];
+    rows = Object.keys(state.data.countries).sort().map(iso => exportRow(iso, state.idx));
+    scope = 'cross-section - all exposed economies at ' + month;
+    stem = 'ribat_cross-section_' + month;
+  } else {
+    const iso = state.selected;
+    if (!iso) return;
+    rows = state.months.map((_, i) => exportRow(iso, i));
+    scope = 'time series - ' + (NAMES[iso] || iso) + ' (' + iso + '), ' + state.months[0] + ' to ' + last;
+    stem = 'ribat_' + iso + '_' + state.months[0] + '_' + last;
+  }
+  if (state.exportFmt === 'json') saveFile(stem + '.json', toJSON(rows, scope), 'application/json');
+  else saveFile(stem + '.csv', toCSV(rows, scope), 'text/csv');
+}
+
+/* The column contract describes the multi-channel payload only; hide the
+   section for the placeholder and single-channel fallbacks rather than emit
+   columns that do not exist. */
+function syncExportUI() {
+  const sec = document.getElementById('dlSection');
+  if (!sec) return;
+  sec.style.display = (!state.placeholder && state.kind === 'intensity_multi') ? '' : 'none';
+  document.getElementById('dlSeries').disabled = !state.selected;
+}
+
+function setFmt(f) {
+  state.exportFmt = f;
+  document.getElementById('btnCSV').setAttribute('aria-pressed', f === 'csv');
+  document.getElementById('btnJSON').setAttribute('aria-pressed', f === 'json');
+}
+document.getElementById('btnCSV').onclick = () => setFmt('csv');
+document.getElementById('btnJSON').onclick = () => setFmt('json');
+document.getElementById('dlCross').onclick = () => doExport('cross');
+document.getElementById('dlSeries').onclick = () => doExport('series');
+
 function setMode(m) {
   state.mode = m;
   document.getElementById('btnRebased').setAttribute('aria-pressed', m === 'rebased');
