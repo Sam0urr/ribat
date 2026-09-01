@@ -457,7 +457,9 @@ function drawSlope(){
   const g=gprRows('rebased'), it=intRows();
   if(!g.length||!it.length) return;
   const iRank=new Map(it.map((r,i)=>[r.iso,i+1]));
-  const rows=g.filter(r=>iRank.has(r.iso)).slice(0,12);
+  /* ISR omitted from this figure by editorial choice; the left-hand numbers
+     are ranks within the charted set, not global GPR ranks. */
+  const rows=g.filter(r=>iRank.has(r.iso)&&r.iso!=='ISR').slice(0,12);
   if(rows.length<2) return;
 
   const W=720,H=460,PAD=26,L=200,R=W-200,step=(H-PAD*2)/(rows.length-1);
