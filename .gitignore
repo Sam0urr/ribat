@@ -6,6 +6,13 @@ data/raw/
 # Processed intermediates. web/data/*.json IS committed — it is what the
 # published map loads — but the tidy CSVs are rebuildable from the pipeline.
 data/processed/*.csv
+# ...except the dependency weights. They are benchmark-year cross-sections that
+# change at most annually, total ~640 KB, and the monthly refresh job needs them
+# on a clean checkout. Committing them also makes the replication package
+# runnable without a 15 MB WITS re-fetch.
+!data/processed/trade_weights.csv
+!data/processed/channel_weights.csv
+!data/processed/va_weights.csv
 data/processed/*.txt
 
 __pycache__/
