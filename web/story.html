@@ -421,12 +421,16 @@ const S={gpr:null,int:null};
 const nm=i=>NAMES[i]||i;
 
 /* ── data selectors ─────────────────────────────────────────────────── */
+/* Economies omitted from every figure on this page by editorial choice.
+   Filtered centrally in the three row-producing functions, so no figure can
+   be missed; ranks renumber over the shown set. */
+const OMIT=new Set(['ISR']);
 function gprRows(mode){
   if(!S.gpr) return [];
   const i=S.gpr.months.length-1;
   return Object.entries(S.gpr.countries)
     .map(([iso,r])=>({iso,v:r[mode]&&r[mode][i]}))
-    .filter(r=>r.v!=null).sort((a,b)=>b.v-a.v);
+    .filter(r=>r.v!=null&&!OMIT.has(r.iso)).sort((a,b)=>b.v-a.v);
 }
 function intRows(){
   if(!S.int) return [];
@@ -437,7 +441,7 @@ function intRows(){
       const v=s[ch]&&s[ch][i]; if(v==null) continue; n+=v*MIX[ch]; d+=MIX[ch];
     }
     return {iso,v:d?n/d:null};
-  }).filter(r=>r.v!=null).sort((a,b)=>b.v-a.v);
+  }).filter(r=>r.v!=null&&!OMIT.has(r.iso)).sort((a,b)=>b.v-a.v);
 }
 /* Absolute change vs the prior 12 months. Not percent: percent explodes off a
    near-zero baseline and would rank the least-exposed economies first. */
@@ -449,7 +453,7 @@ function movers(month,channel){
     if(!s||s[i]==null) return null;
     const w=s.slice(i-12,i).filter(v=>v!=null); if(!w.length) return null;
     return {iso,v:s[i]-w.reduce((a,b)=>a+b,0)/w.length};
-  }).filter(Boolean).sort((a,b)=>b.v-a.v);
+  }).filter(Boolean).filter(r=>!OMIT.has(r.iso)).sort((a,b)=>b.v-a.v);
 }
 
 /* ── slope chart: the crossings are the argument ────────────────────── */
@@ -457,9 +461,7 @@ function drawSlope(){
   const g=gprRows('rebased'), it=intRows();
   if(!g.length||!it.length) return;
   const iRank=new Map(it.map((r,i)=>[r.iso,i+1]));
-  /* ISR omitted from this figure by editorial choice; the left-hand numbers
-     are ranks within the charted set, not global GPR ranks. */
-  const rows=g.filter(r=>iRank.has(r.iso)&&r.iso!=='ISR').slice(0,12);
+  const rows=g.filter(r=>iRank.has(r.iso)).slice(0,12);
   if(rows.length<2) return;
 
   const W=720,H=460,PAD=26,L=200,R=W-200,step=(H-PAD*2)/(rows.length-1);
