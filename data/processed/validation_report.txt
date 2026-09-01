@@ -1,13 +1,13 @@
 Intensity index - validation report
-generated 2026-08-31
-months 1985-01 to 2026-07, 43 economies, channels: choke, crm, energy, trade, va
+generated 2026-09-01
+months 1985-01 to 2026-08, 43 economies, channels: choke, crm, energy, trade, va
 
 ========================================================================
 T1  DISCRIMINANT VALIDITY - is Intensity just re-plotting GPR?
 ========================================================================
-  Pooled Pearson  own-GPR vs Intensity :  0.472
-  Pooled Spearman own-GPR vs Intensity :  0.505
-  Cross-sectional Spearman, mean       :  0.174   (min -0.35, max  0.68, n=91 months)
+  Pooled Pearson  own-GPR vs Intensity :  0.471
+  Pooled Spearman own-GPR vs Intensity :  0.503
+  Cross-sectional Spearman, mean       :  0.173   (min -0.35, max  0.68, n=92 months)
 
   Interpretation: values near +1 would mean the exposure weighting is
   redundant. Values near 0 mean Intensity ranks economies differently
@@ -18,11 +18,11 @@ T2  CHANNEL DISCRIMINATION - are the sliders decorative?
 ========================================================================
 channel  choke    crm  energy  trade     va
 channel                                    
-choke    1.000  0.251   0.221  0.212  0.295
-crm      0.251  1.000   0.738  0.922  0.898
-energy   0.221  0.738   1.000  0.771  0.759
-trade    0.212  0.922   0.771  1.000  0.936
-va       0.295  0.898   0.759  0.936  1.000
+choke    1.000  0.250   0.219  0.210  0.294
+crm      0.250  1.000   0.737  0.921  0.897
+energy   0.219  0.737   1.000  0.771  0.760
+trade    0.210  0.921   0.771  1.000  0.936
+va       0.294  0.897   0.760  0.936  1.000
 
   Mean off-diagonal Spearman:  0.600
   Interpretation: near +1 across the board would mean the channels are
