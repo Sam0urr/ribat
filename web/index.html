@@ -56,6 +56,10 @@
   #detail h3{margin:0 0 3px;font-size:15px}
   #detail .iso{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:14px}
   .spark{width:100%;height:auto;display:block;margin:2px 0 3px}
+  .stack{width:100%;height:auto;display:block;margin:2px 0 3px}
+  .stack-key{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:9.5px;color:var(--muted);
+    font-family:var(--mono);margin:0 0 6px;letter-spacing:.02em}
+  .stack-key i{display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:1px}
   .spark-cap{display:flex;justify-content:space-between;font-family:var(--mono);
     font-size:9.5px;color:var(--muted);margin:0 0 12px;letter-spacing:.02em}
   @media (prefers-reduced-motion:no-preference){.spark path{transition:d .15s linear}}
@@ -454,6 +458,88 @@ function sparkSVG(iso) {
     + `<span>${state.months[n-1].slice(0,4)}</span></div>`;
 }
 
+/* Channel decomposition. Intensity is a weighted MEAN, not a sum, so the bands
+   are each channel's contribution to that mean, v*w / den, with den recomputed
+   per month over the channels that actually have data. They therefore sum
+   exactly to the Intensity line drawn above. Colours are four steps of the
+   existing single-hue RAMP, not categorical hues (invariant 5). */
+function stackSVG(iso) {
+  const rec = state.data.countries[iso];
+  if (!rec) return '';
+  const w = state.weights, series = rec[state.mode] || {};
+  const chans = [
+    [state.basis, w.trade, state.basis === 'va' ? 'Trade (VA)' : 'Trade'],
+    ['energy', w.energy, 'Energy'],
+    ['crm', w.crm, 'Raw mat.'],
+    ['choke', w.choke, 'Chokepoint'],
+  ];
+  const n = state.months.length;
+  const contrib = chans.map(() => new Array(n).fill(null));
+  const totals = new Array(n).fill(null);
+  let rescaled = 0;
+
+  for (let i = 0; i < n; i++) {
+    let den = 0; const vs = [];
+    chans.forEach(([ch, wt], c) => {
+      const v = series[ch]?.[i];
+      if (v == null || Number.isNaN(v)) { vs[c] = null; return; }
+      vs[c] = v; den += wt;
+    });
+    if (den <= 0) continue;
+    if (vs.some((v, c) => v == null && chans[c][1] > 0)) rescaled++;
+    let tot = 0;
+    chans.forEach(([ch, wt], c) => {
+      if (vs[c] == null) return;
+      const part = vs[c] * wt / den;
+      contrib[c][i] = part; tot += part;
+    });
+    totals[i] = tot;
+  }
+
+  const ok = totals.filter(v => v != null);
+  if (ok.length < 2) return '';
+  const W = 268, H = 62, P = 5, max = Math.max(...ok) || 1;
+  const X = i => P + (i / (n - 1)) * (W - 2 * P);
+  const Y = v => H - P - (v / max) * (H - 2 * P);
+  const COL = ['#184f95', '#256abf', '#3987e5', '#6da7ec'];
+
+  const cum = new Array(n).fill(0);
+  let bands = '', key = '';
+  chans.forEach(([ch, wt, lbl], c) => {
+    if (wt > 0) {
+      let d = '', i = 0;
+      while (i < n) {                       // one polygon per run of present months
+        if (totals[i] == null) { i++; continue; }
+        let j = i; while (j + 1 < n && totals[j + 1] != null) j++;
+        for (let k = i; k <= j; k++)
+          d += (k === i ? 'M' : 'L') + X(k).toFixed(1) + ' ' + Y(cum[k] + (contrib[c][k] || 0)).toFixed(1) + ' ';
+        for (let k = j; k >= i; k--)
+          d += 'L' + X(k).toFixed(1) + ' ' + Y(cum[k]).toFixed(1) + ' ';
+        d += 'Z '; i = j + 1;
+      }
+      bands += `<path d="${d.trim()}" fill="${COL[c]}" opacity=".93"/>`;
+      key += `<span><i style="background:${COL[c]}"></i>${lbl} ${wt}</span>`;
+    }
+    for (let k = 0; k < n; k++) cum[k] += contrib[c][k] || 0;
+  });
+  if (!bands) return '';
+
+  const cx = X(state.idx).toFixed(1);
+  const mark = `<line x1="${cx}" y1="${P}" x2="${cx}" y2="${H - P}" stroke="var(--ink)" opacity=".5"/>`;
+  const t = totals[state.idx];
+  const shares = t ? chans.map(([ch, wt, lbl], c) =>
+      contrib[c][state.idx] == null ? null : `${lbl} ${Math.round(contrib[c][state.idx] / t * 100)}%`)
+    .filter(Boolean).join(', ') : 'no data';
+  const alt = `Channel composition of ${NAMES[iso] || iso} Intensity, ${state.months[0]} to `
+    + `${state.months[n - 1]}. At ${state.months[state.idx]}: ${shares}.`;
+
+  return `<svg class="stack" viewBox="0 0 ${W} ${H}" role="img" aria-label="${alt}">${bands}${mark}</svg>`
+    + `<div class="stack-key">${key}</div>`
+    + (rescaled ? `<p class="cap">Bands rescale in ${rescaled} of ${n} months where a channel has no `
+        + `data: the mix is renormalised over the channels present, so a band can widen for a coverage `
+        + `reason rather than an exposure one.</p>` : '');
+}
+
 function detail(iso) {
   const rec = state.data.countries[iso];
   const el = document.getElementById('detail');
@@ -470,12 +556,14 @@ function detail(iso) {
         const v = rec[state.mode]?.[ch]?.[state.idx];
         return `<div class="metric"><span>${lbl}</span><b>${v == null ? '—' : (state.mode === 'rebased' ? v.toFixed(0) : v.toFixed(3))}</b></div>`;
       }).join('');
+    const stackHTML = stackSVG(iso);
     el.innerHTML = `
       <h3>${NAMES[iso] || iso}</h3>
       <div class="iso">${iso} · ${state.months[state.idx]} · Intensity (${state.mode}), your channel mix</div>
       <div class="metric"><span><b>Intensity</b></span><b>${total == null ? '—' : (state.mode === 'rebased' ? total.toFixed(1) : total.toFixed(3))}</b></div>
       ${sparkSVG(iso)}
       ${chRows}
+      ${stackHTML ? `<h2 style="margin-top:16px">Channel decomposition</h2>` + stackHTML : ''}
       ${cov != null ? `<div class="metric"><span>Trade observed by GPR</span><b>${(cov*100).toFixed(0)}%</b></div>` : ''}
       ${srcs.length ? `<h2 style="margin-top:14px">Top risk sources (trade, latest month)</h2>` + srcs.map(([j,w,c]) =>
         `<div class="metric"><span>${NAMES[j] || j} <span style="color:var(--muted)">· ${(w*100).toFixed(1)}% of trade</span></span><b>${c.toFixed(0)}</b></div>`).join('') : ''}
