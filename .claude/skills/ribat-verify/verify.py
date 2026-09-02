@@ -242,8 +242,17 @@ def main() -> int:
           "03 exits non-zero when it refuses, so CI cannot ignore it")
 
     section("export contract (map)")
-    check("preserveDrawingBuffer: true" in html,
-          "map is constructed with a readable back buffer (PNG export)")
+    # The v4 spelling passes this file's eye but not MapLibre's: v5 ignores a
+    # top-level preserveDrawingBuffer silently. Require the nested form, which is
+    # the one that actually reaches the GL context.
+    check("canvasContextAttributes" in html and "preserveDrawingBuffer: true" in html,
+          "map back buffer is readable via canvasContextAttributes (PNG export)")
+    # Match the assignment, not the word: the comment above it necessarily
+    # mentions the top-level spelling in order to warn about it.
+    assigns = [ln for ln in html.splitlines() if "preserveDrawingBuffer:" in ln]
+    check(bool(assigns) and all("canvasContextAttributes" in ln for ln in assigns),
+          "preserveDrawingBuffer is only set inside canvasContextAttributes, "
+          "not at the top level where v5 ignores it")
     check("function exportMapPNG(" in html and "'image/png'" in html,
           "index.html: map PNG export present")
     check("#ticks span" in html.split("function exportMapPNG(")[-1][:3000],
