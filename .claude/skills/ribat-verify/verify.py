@@ -92,6 +92,18 @@ def main() -> int:
                                 bad_idx += 1
                             elif not (0 < float(pair[1]) <= 1.0):
                                 bad_w += 1
+            # The payload is keyed by the TARGET vintage a month resolves to, not
+            # by the year the underlying source published. Keying it by the raw
+            # benchmark year shipped a "2022" block for the value-added channel
+            # and no "2023" at all, so a client following weight_year_for found
+            # nothing for every month from 2024 on. A missing block is silent -
+            # the attribution simply comes back short - so it is checked here.
+            want_years = {str(y) for y in (d.get("years") or [])}
+            gaps = [f"{iso}/{ch}" for iso, per_ch in (d.get("w") or {}).items()
+                    for ch, per_yr in per_ch.items() if want_years - set(per_yr)]
+            check(not gaps,
+                  f"{p.name}: every exposed x channel carries all {len(want_years)} vintages"
+                  + ("" if not gaps else " -> missing in " + ", ".join(sorted(gaps)[:5])))
             check(bad_idx == 0, f"{p.name}: every source index is in range")
             check(bad_w == 0, f"{p.name}: every weight lies in (0, 1]")
             check(bad_iso == 0, f"{p.name}: ISO3 keys and declared channels only")
@@ -231,6 +243,38 @@ def main() -> int:
 
     # data/processed/ is gitignored and the refresh runs in CI, so a working tree
     # can rebuild a shorter payload from older inputs without saying so.
+    # The reverse map inverts the question: not what an economy bears, but which
+    # economies produce a selected country's exposure. Its whole risk is quiet
+    # incompleteness - the chokepoint channel has no source country, so an
+    # attribution that does not say so reads as though it accounts for
+    # everything. Every surface that shows it must disclose the residual.
+    section("reverse map (source attribution)")
+    check("function attribution(" in html and "SHARE_BREAKS" in html,
+          "index.html: source attribution present")
+    check("'./data/weights.json'" in html and "'./data/gpr.json'" in html,
+          "reverse payloads are fetched by the page")
+    check("function loadReverse(" in html and "reverseReady()" in html,
+          "reverse payloads load on demand, not at page load")
+    check("different month grids" in html,
+          "refuses to attribute when gpr.json and intensity.json disagree on months")
+    check("['choke', th.choke]" in html.replace('"', "'"),
+          "denominator includes chokepoint, so shares reconcile with Intensity")
+    rev = html.split("function detailSources(")[-1].split("\nfunction ")[0]
+    check("residualShare" in rev and "unattributable" in rev,
+          "panel discloses the unattributable chokepoint share")
+    check("chokepoint transit" in html.lower(),
+          "screen-reader table names the unattributable row")
+    check("row_type" in html and "'unattributed'" in html,
+          "export carries the residual as a labelled row, not a silent shortfall")
+    check("unattributed_choke_share" in html,
+          "export metadata states the unattributed share")
+    check("attrPng" in html.split("function exportMapPNG(")[-1].split("\nfunction ")[0],
+          "PNG says whose sources it shows and what it leaves out")
+    check('id="btnSources"' in html and 'id="btnExposure"' in html,
+          "map view toggle present")
+    check('id="dlSources"' in html,
+          "source attribution is downloadable")
+
     section("pipeline guards")
     p3 = (ROOT / "pipeline" / "03_build_intensity.py")
     src3 = p3.read_text(encoding="utf-8") if p3.exists() else ""
@@ -255,9 +299,13 @@ def main() -> int:
           "not at the top level where v5 ignores it")
     check("function exportMapPNG(" in html and "'image/png'" in html,
           "index.html: map PNG export present")
-    check("#ticks span" in html.split("function exportMapPNG(")[-1][:3000],
+    # Scope to the function body, not a fixed character window: the window was
+    # 3000 chars and adding one sentence to the footer caution pushed the tick
+    # copy past it, failing a check about code that had not changed.
+    png_body = html.split("function exportMapPNG(")[-1].split("\nfunction ")[0]
+    check("#ticks span" in png_body,
           "PNG footer copies the legend's real break values")
-    check("CITATION" in html.split("function exportMapPNG(")[-1][:3000],
+    check("CITATION" in png_body,
           "PNG footer carries the citation")
 
     # ── result --------------------------------------------------------------
