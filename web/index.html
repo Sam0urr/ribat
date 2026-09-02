@@ -153,8 +153,9 @@
     <div class="dl">
       <button id="dlCross" type="button">This month, all economies</button>
       <button id="dlSeries" type="button" disabled>Selected economy, all months</button>
+      <button id="dlPng" type="button">Map as it appears (PNG)</button>
     </div>
-    <p class="note">Each file carries the view state that produced it, a coverage qualifier per channel, and the CC-BY citation. Chokepoint coverage is blank by construction — the file header says why. GeoJSON covers the cross-section only.</p>
+    <p class="note">Each file carries the view state that produced it, a coverage qualifier per channel, and the CC-BY citation. Chokepoint coverage is blank by construction — the file header says why. GeoJSON covers the cross-section only; the PNG carries the legend and its break values in a footer.</p>
   </div>
 </div>
 <div class="panel" id="legend">
@@ -311,7 +312,11 @@ function bucket(v, sorted) {
 const map = new maplibregl.Map({
   container: 'map',
   style: { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': '#0d1117' } }] },
-  center: [12, 25], zoom: 0.55, attributionControl: false
+  center: [12, 25], zoom: 0.55, attributionControl: false,
+  // Keeps the WebGL back buffer readable after a frame so the canvas can be
+  // exported. It costs memory on every page load whether or not anyone ever
+  // downloads a PNG - the standing price of the feature.
+  preserveDrawingBuffer: true
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 
@@ -780,13 +785,17 @@ function toGeoJSON() {
   return JSON.stringify({ type: 'FeatureCollection', metadata: meta, features: features });
 }
 
-function saveFile(name, text, mime) {
-  const url = URL.createObjectURL(new Blob([text], { type: mime + ';charset=utf-8' }));
+function saveBlob(name, blob) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
   document.getElementById('liveRegion').textContent = 'Downloaded ' + name + '.';
+}
+
+function saveFile(name, text, mime) {
+  saveBlob(name, new Blob([text], { type: mime + ';charset=utf-8' }));
 }
 
 function doExport(which) {
@@ -940,6 +949,85 @@ document.getElementById('detail').addEventListener('click', e => {
   const b = e.target.closest('[data-chart]');
   if (b) exportChart(b.dataset.chart);
 });
+
+/* Map PNG. A bare canvas grab would be a picture of colours with no scale -
+   unreadable, and stripped of the attribution the page carries. The footer
+   therefore composites the ramp with the *actual* break values as displayed,
+   the unit line, the channel mix, the caution and the citation, for the same
+   reason the chart export redraws its caption. */
+function exportMapPNG() {
+  const src = (typeof map !== 'undefined' && map && map.getCanvas) ? map.getCanvas() : null;
+  if (!src || !src.width || !src.height) {
+    document.getElementById('liveRegion').textContent = 'Map has not finished rendering; PNG unavailable.';
+    return;
+  }
+  const cs = getComputedStyle(document.documentElement);
+  const V = n => cs.getPropertyValue('--' + n).trim();
+  const FAM = V('font').replace(/"/g, "'");
+  const S = Math.max(1, Math.min(3, src.width / (src.clientWidth || src.width)));
+  const P = 16 * S, LH = 12 * S;
+  const font = (px, wt) => (wt ? wt + ' ' : '') + Math.round(px * S) + 'px ' + FAM;
+
+  const w = state.weights;
+  const mix = 'Channel mix ' + [[state.basis === 'va' ? 'trade (VA)' : 'trade', w.trade],
+    ['energy', w.energy], ['raw mat.', w.crm], ['chokepoint', w.choke]]
+    .map(kv => kv[0] + ' ' + kv[1]).join(' · ') + ' · renormalised to sum to 1';
+
+  // Wrap to the image width before sizing the canvas, so nothing is clipped.
+  const gm = document.createElement('canvas').getContext('2d');
+  gm.font = font(9);
+  const maxW = src.width - 2 * P;
+  const wrap = txt => {
+    const out = []; let cur = '';
+    for (const word of String(txt).split(/\s+/)) {
+      const t = cur ? cur + ' ' + word : word;
+      if (cur && gm.measureText(t).width > maxW) { out.push(cur); cur = word; } else cur = t;
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+  const caution = wrap('Contemporaneous measure of reported exposure, not a forecast. '
+    + 'The channel mix is a sensitivity analysis, not a ranking. '
+    + 'Coverage varies by economy; the data export reports it per channel.');
+  const attrib = wrap((location.host || 'sam0urr.github.io') + ' · downloaded '
+    + new Date().toISOString().slice(0, 10) + ' · ' + CITATION + ' Boundaries: Natural Earth.');
+  const FOOT = Math.round(89 * S + (caution.length - 1) * LH + 6 * S + attrib.length * LH + 14 * S);
+
+  const out = document.createElement('canvas');
+  out.width = src.width; out.height = src.height + FOOT;
+  const g = out.getContext('2d');
+  g.drawImage(src, 0, 0);
+  g.fillStyle = V('panel'); g.fillRect(0, src.height, out.width, FOOT);
+  g.fillStyle = V('line'); g.fillRect(0, src.height, out.width, Math.max(1, S));
+
+  const top = src.height;
+  g.textAlign = 'left'; g.fillStyle = V('ink'); g.font = font(15, '600');
+  g.fillText('Ribat — Intensity (' + state.mode + '), ' + state.months[state.idx], P, top + 26 * S);
+  g.fillStyle = V('muted'); g.font = font(10);
+  g.fillText(mix, P, top + 41 * S);
+
+  // The ramp as drawn, labelled with the breaks the page is showing.
+  const sw = 30 * S, sh = 9 * S, ry = top + 61 * S;
+  RAMP.forEach((c, i) => { g.fillStyle = c; g.fillRect(P + i * sw, ry - sh, sw, sh); });
+  g.fillStyle = V('muted'); g.font = font(9);
+  const ticks = [...document.querySelectorAll('#ticks span')].map(t => t.textContent.trim());
+  g.textAlign = 'center';
+  ticks.forEach((t, i) => { if (t) g.fillText(t, P + (i + 1) * sw, ry + 10 * S); });
+  g.textAlign = 'left';
+  g.fillText((document.getElementById('legendUnit') || {}).textContent || '',
+    P + RAMP.length * sw + 12 * S, ry);
+
+  let y = top + 89 * S;
+  for (const line of caution) { g.fillText(line, P, y); y += LH; }
+  y += 6 * S - LH;
+  for (const line of attrib) { y += LH; g.fillText(line, P, y); }
+
+  out.toBlob(b => {
+    if (b) saveBlob('ribat_map_' + state.months[state.idx] + '.png', b);
+    else document.getElementById('liveRegion').textContent = 'PNG encoding failed.';
+  }, 'image/png');
+}
+document.getElementById('dlPng').onclick = exportMapPNG;
 
 function setFmt(f) {
   state.exportFmt = f;

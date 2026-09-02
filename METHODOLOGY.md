@@ -280,6 +280,16 @@ several features (Australia) are merged into one MultiPolygon, so a join cannot
 double-count them. There is no GeoJSON time series — the same polygon repeated
 across 500 months is not a useful artefact.
 
+The map is also exportable as **PNG**, as it appears. A bare canvas grab would
+be a picture of colours with no scale, so a footer composites the ramp with the
+break values actually displayed, the unit line, the channel mix, the
+not-a-forecast caution and the citation; the footer sizes itself to the wrapped
+text so nothing is clipped at any capture width. Reading pixels back from a
+WebGL canvas requires `preserveDrawingBuffer`, which costs memory on every page
+load whether or not anyone exports — a standing charge accepted for this
+convenience, and the reason the PNG was the last of the export formats to be
+built rather than the first.
+
 **Why `covered_choke` is always empty.** For trade, value added, energy and raw
 materials, `covered_*` is the share of that channel's *denominator* observed by
 the GPR-44 source set — a genuine fraction of a measured flow. The chokepoint
