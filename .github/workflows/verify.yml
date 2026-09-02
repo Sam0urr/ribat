@@ -1,0 +1,42 @@
+# Runs the pre-commit verification on every push and pull request. The checks
+# in .claude/skills/ribat-verify/verify.py only bound the machine that
+# remembered to run them by hand; running them here binds the repository, which
+# is the point of writing an invariant down rather than a convention.
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # verify.py checks the inline script with `node --check` and downgrades to
+      # a warning when node is absent, so a runner without it would pass a
+      # syntax error in index.html in silence. Node is installed to keep that
+      # check load-bearing rather than advisory.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # verify.py imports the standard library only, so there is nothing to
+      # install. It does shell out to `git ls-files` for the banned-token scan,
+      # which the checkout above provides.
+      - name: Run ribat-verify
+        run: python3 .claude/skills/ribat-verify/verify.py
