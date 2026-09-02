@@ -184,6 +184,13 @@ def main() -> int:
     check("not a forecast" in html,
           "chart export burns in the not-a-forecast caution")
 
+    check("function toGeoJSON(" in html and "application/geo+json" in html,
+          "index.html: GeoJSON export present")
+    check("props.attribution = CITATION" in html,
+          "GeoJSON repeats attribution per feature (foreign members may be dropped)")
+    check("byIso" in html and "MultiPolygon" in html,
+          "GeoJSON merges multi-feature economies into one feature each")
+
     # ── result --------------------------------------------------------------
     print()
     for w in WARN:

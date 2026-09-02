@@ -148,12 +148,13 @@
     <div class="seg" role="group" aria-label="Export format">
       <button id="btnCSV" aria-pressed="true">CSV</button>
       <button id="btnJSON" aria-pressed="false">JSON</button>
+      <button id="btnGeo" aria-pressed="false">GeoJSON</button>
     </div>
     <div class="dl">
       <button id="dlCross" type="button">This month, all economies</button>
       <button id="dlSeries" type="button" disabled>Selected economy, all months</button>
     </div>
-    <p class="note">Each file carries the view state that produced it, a coverage qualifier per channel, and the CC-BY citation. Chokepoint coverage is blank by construction — the file header says why.</p>
+    <p class="note">Each file carries the view state that produced it, a coverage qualifier per channel, and the CC-BY citation. Chokepoint coverage is blank by construction — the file header says why. GeoJSON covers the cross-section only.</p>
   </div>
 </div>
 <div class="panel" id="legend">
@@ -738,6 +739,47 @@ function toJSON(rows, scope) {
   return JSON.stringify({ meta: meta, columns: EXPORT_COLS, rows: rows }, null, 2);
 }
 
+/* GeoJSON. Cross-section only: geometry repeated across 500 months would be an
+   enormous file and nobody wants the same polygon 500 times. Built from the
+   features the map already holds, so the geometry is exactly what was on
+   screen and no second copy of the boundaries ships. Properties reuse the CSV
+   column names; attribution is repeated per feature because RFC 7946 parsers
+   may drop the top-level foreign member, and losing it is a licence problem. */
+const GEO_STR_COLS = ['iso3', 'name', 'month'];
+
+function toGeoJSON() {
+  if (typeof world === 'undefined' || !world || !world.features) return null;
+  const month = state.months[state.idx];
+  const meta = {};
+  for (const kv of exportMeta('cross-section - all exposed economies at ' + month)) meta[kv[0]] = kv[1];
+  // Natural Earth carries some economies as more than one feature. Emitting
+  // both would duplicate a country in any join, so parts are merged into one
+  // MultiPolygon and the collection holds exactly one feature per economy.
+  const byIso = new Map();
+  for (const f of world.features) {
+    const iso = f.properties && f.properties.iso3, g = f.geometry;
+    if (!iso || !state.data.countries[iso] || !g) continue;
+    const polys = g.type === 'MultiPolygon' ? g.coordinates
+                : g.type === 'Polygon' ? [g.coordinates] : [];
+    if (!polys.length) continue;
+    if (byIso.has(iso)) byIso.get(iso).polys.push(...polys);
+    else byIso.set(iso, { id: f.id, polys: polys.slice() });
+  }
+  const features = [];
+  for (const [iso, ent] of byIso) {
+    const row = exportRow(iso, state.idx), props = {};
+    for (const c of EXPORT_COLS) {
+      const v = row[c];
+      props[c] = (v === '' || v == null) ? null : (GEO_STR_COLS.includes(c) ? v : Number(v));
+    }
+    props.attribution = CITATION;
+    features.push({ type: 'Feature', id: ent.id, properties: props,
+                    geometry: { type: 'MultiPolygon', coordinates: ent.polys } });
+  }
+  if (!features.length) return null;
+  return JSON.stringify({ type: 'FeatureCollection', metadata: meta, features: features });
+}
+
 function saveFile(name, text, mime) {
   const url = URL.createObjectURL(new Blob([text], { type: mime + ';charset=utf-8' }));
   const a = document.createElement('a');
@@ -750,6 +792,16 @@ function saveFile(name, text, mime) {
 function doExport(which) {
   let rows, scope, stem;
   const last = state.months[state.months.length - 1];
+  if (which === 'cross' && state.exportFmt === 'geo') {
+    const gj = toGeoJSON();
+    if (!gj) {
+      document.getElementById('liveRegion').textContent =
+        'Map geometry has not finished loading; GeoJSON is unavailable.';
+      return;
+    }
+    saveFile('ribat_cross-section_' + state.months[state.idx] + '.geojson', gj, 'application/geo+json');
+    return;
+  }
   if (which === 'cross') {
     const month = state.months[state.idx];
     rows = Object.keys(state.data.countries).sort().map(iso => exportRow(iso, state.idx));
@@ -773,7 +825,9 @@ function syncExportUI() {
   const sec = document.getElementById('dlSection');
   if (!sec) return;
   sec.style.display = (!state.placeholder && state.kind === 'intensity_multi') ? '' : 'none';
-  document.getElementById('dlSeries').disabled = !state.selected;
+  // GeoJSON is a cross-section format; a per-month geometry series is refused
+  // rather than silently emitted as 500 copies of one polygon.
+  document.getElementById('dlSeries').disabled = !state.selected || state.exportFmt === 'geo';
 }
 
 /* Chart export. The panel SVGs are styled by the page: CSS custom properties
@@ -891,9 +945,12 @@ function setFmt(f) {
   state.exportFmt = f;
   document.getElementById('btnCSV').setAttribute('aria-pressed', f === 'csv');
   document.getElementById('btnJSON').setAttribute('aria-pressed', f === 'json');
+  document.getElementById('btnGeo').setAttribute('aria-pressed', f === 'geo');
+  syncExportUI();
 }
 document.getElementById('btnCSV').onclick = () => setFmt('csv');
 document.getElementById('btnJSON').onclick = () => setFmt('json');
+document.getElementById('btnGeo').onclick = () => setFmt('geo');
 document.getElementById('dlCross').onclick = () => doExport('cross');
 document.getElementById('dlSeries').onclick = () => doExport('series');
 
