@@ -36,6 +36,7 @@ Output: data/processed/intensity_monthly.csv
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -134,6 +135,40 @@ def carry_forward(w: pd.DataFrame, years: list[int]) -> tuple[pd.DataFrame, dict
             blocks.append(blk)
     stale = {e: int(max(ys)) for e, ys in avail.items() if max(ys) < max(years)}
     return pd.concat(blocks, ignore_index=True), stale
+
+
+def guard_no_regression(payload: dict, out: Path) -> list[str]:
+    """Report ways `payload` is poorer than the payload already at `out`.
+
+    data/processed/ is gitignored and the monthly refresh runs in CI, so a
+    working tree can easily hold GPR inputs older than the committed payload.
+    Rebuilding from those inputs silently drops months: the run looks clean, the
+    file shrinks, and nothing says so. This makes that loud.
+
+    Pass --allow-regression when a shorter grid is the intended result, e.g. an
+    upstream revision genuinely withdrew months.
+    """
+    if not out.exists():
+        return []
+    try:
+        old = json.loads(out.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    bad = []
+    om, nm = old.get("months") or [], payload.get("months") or []
+    if om and nm:
+        if nm[-1] < om[-1]:
+            bad.append(f"last month goes backwards: {om[-1]} -> {nm[-1]}")
+        if len(nm) < len(om):
+            bad.append(f"month count shrinks: {len(om)} -> {len(nm)}")
+    oc, nc = len(old.get("countries") or {}), len(payload.get("countries") or {})
+    if nc < oc:
+        bad.append(f"exposed economies shrink: {oc} -> {nc}")
+    ochs, nchs = set(old.get("channels") or []), set(payload.get("channels") or [])
+    missing = ochs - nchs
+    if missing:
+        bad.append("channels disappear: " + ", ".join(sorted(missing)))
+    return bad
 
 
 def main() -> None:
@@ -265,6 +300,18 @@ def main() -> None:
     }
     WEB.mkdir(parents=True, exist_ok=True)
     out = WEB / "intensity.json"
+    regressions = guard_no_regression(payload, out)
+    if regressions and "--allow-regression" not in sys.argv:
+        print("\nREFUSING TO WRITE — the rebuild is poorer than the payload on disk:")
+        for r in regressions:
+            print(f"  - {r}")
+        print("\nThe usual cause is stale inputs: data/processed/ is gitignored and the\n"
+              "monthly refresh runs in CI, so this tree may hold an older GPR download\n"
+              "than the committed payload. Re-run 01_load_gpr.py against a current\n"
+              "workbook, or pass --allow-regression if the shorter grid is intended.")
+        sys.exit(1)
+    if regressions:
+        print("WARNING overriding regression checks: " + "; ".join(regressions))
     out.write_text(json.dumps(payload, separators=(",", ":")))
     kb = out.stat().st_size // 1024
     print(f"wrote {out}  ({len(countries)} economies x {len(months)} months x "
