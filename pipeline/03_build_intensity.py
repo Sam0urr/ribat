@@ -137,6 +137,67 @@ def carry_forward(w: pd.DataFrame, years: list[int]) -> tuple[pd.DataFrame, dict
     return pd.concat(blocks, ignore_index=True), stale
 
 
+def load_gpr() -> pd.DataFrame:
+    """Load the monthly country GPR panel from the freshest pinned source.
+
+    data/raw and data/processed are both gitignored and the refresh runs in CI,
+    so a clone has neither the workbook nor the processed CSV. web/data/gpr.json
+    is tracked, carries the same `recent` variant this script consumes, and is
+    versioned alongside the payload it produced - so it pins the GPR vintage that
+    built any given commit. Reading it makes
+
+        git checkout <sha> && python3 pipeline/03_build_intensity.py
+
+    reproduce that commit's payload from a clean clone, with nothing extra
+    committed. It also sidesteps upstream revision: the workbook is republished
+    in place each month with recent months revised, so re-downloading reproduces
+    today's numbers, not a past commit's.
+
+    The processed CSV wins when it is at least as current; otherwise gpr.json
+    does, and says so.
+    """
+    csv_path, json_path = PROC / "gpr_country_monthly.csv", WEB / "gpr.json"
+
+    csv_df = None
+    if csv_path.exists():
+        df = pd.read_csv(csv_path, parse_dates=["month"])
+        csv_df = df[(df["variant"] == "recent") & (df["month"].dt.year >= START_YEAR)]
+
+    json_df = None
+    if json_path.exists():
+        d = json.loads(json_path.read_text())
+        months = pd.to_datetime(d.get("months") or [])
+        rows = []
+        for iso, rec in (d.get("countries") or {}).items():
+            lvl, reb = rec.get("level") or [], rec.get("rebased") or []
+            for i, m in enumerate(months):
+                a = lvl[i] if i < len(lvl) else None
+                b = reb[i] if i < len(reb) else None
+                if a is None and b is None:
+                    continue
+                rows.append((m, a, iso, "recent", b))
+        if rows:
+            json_df = pd.DataFrame(
+                rows, columns=["month", "gpr", "iso3", "variant", "gpr_rebased"])
+            json_df = json_df[json_df["month"].dt.year >= START_YEAR]
+
+    def last(df):
+        return None if df is None or df.empty else df["month"].max()
+
+    lc, lj = last(csv_df), last(json_df)
+    if csv_df is not None and (lj is None or lc >= lj):
+        print(f"GPR source: {csv_path.name} (through {str(lc)[:7]})")
+        return csv_df
+    if json_df is not None:
+        why = "no processed CSV" if csv_df is None else f"CSV only reaches {str(lc)[:7]}"
+        print(f"GPR source: web/data/gpr.json (through {str(lj)[:7]}) — {why}")
+        return json_df
+    raise SystemExit(
+        "No GPR panel found. Expected data/processed/gpr_country_monthly.csv "
+        "(run 01_load_gpr.py against the workbook) or the tracked web/data/gpr.json."
+    )
+
+
 def guard_no_regression(payload: dict, out: Path) -> list[str]:
     """Report ways `payload` is poorer than the payload already at `out`.
 
@@ -172,8 +233,7 @@ def guard_no_regression(payload: dict, out: Path) -> list[str]:
 
 
 def main() -> None:
-    gpr = pd.read_csv(PROC / "gpr_country_monthly.csv", parse_dates=["month"])
-    gpr = gpr[(gpr["variant"] == "recent") & (gpr["month"].dt.year >= START_YEAR)]
+    gpr = load_gpr()
     months = sorted(gpr["month"].unique())
 
     # ---- assemble long weight table: one row per (i, j, year, channel) -----
