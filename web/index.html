@@ -763,6 +763,16 @@ function render() {
     .filter(v => v != null).sort((a, b) => a - b);
 
   for (const f of world.features) {
+    // Five Natural Earth entities (Somaliland, Kosovo, N. Cyprus, Indian Ocean
+    // Ter., Siachen Glacier) hold no ISO 3166-1 numeric code, so world-atlas
+    // emits them without a topology id and MapLibre cannot carry state for
+    // them: setFeatureState raised "feature id must be provided" once per
+    // feature on every render. They can never take a value either - iso3
+    // resolves to null and the payload is keyed by ISO3 - and the fill layer
+    // already coalesces absent state to the no-data colour, which is precisely
+    // what the loop was writing for them. Skipping is what the paint
+    // expression was written to handle.
+    if (f.id == null) continue;
     const v = f.properties.iso3 && valueOf(f.properties.iso3);
     map.setFeatureState({ source: 'countries', id: f.id }, { colour: v == null ? '#1c222b' : colourFor(bucket(v, sorted)) });
   }
