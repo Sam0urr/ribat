@@ -275,6 +275,24 @@ def main() -> int:
     check('id="dlSources"' in html,
           "source attribution is downloadable")
 
+    # The Sankey's whole claim is the middle column: without it the picture is a
+    # ranked bar chart with curves on it. And its honesty rests on one scale
+    # across both columns, so the source column ends short by exactly the
+    # unattributable share - drop that and the diagram silently asserts the
+    # attribution is complete.
+    check("function sankeySVG(" in html, "index.html: source-routing Sankey present")
+    check(">SOURCE<" in html and ">CHANNEL<" in html,
+          "Sankey keeps its middle column (source -> channel -> economy)")
+    check("no source country" in html,
+          "chokepoint band is marked as having no inflow")
+    check("short of the channel column" in html,
+          "caption explains the column shortfall as the unattributable share")
+    check('data-chart="sankey"' in html and "'routing'" in html,
+          "Sankey exports as its own figure")
+    sk = html.split("function sankeySVG(")[-1].split("\nfunction ")[0]
+    check("a.total" in sk and "scale" in sk,
+          "both columns share one scale, so the shortfall is to scale")
+
     section("pipeline guards")
     p3 = (ROOT / "pipeline" / "03_build_intensity.py")
     src3 = p3.read_text(encoding="utf-8") if p3.exists() else ""
