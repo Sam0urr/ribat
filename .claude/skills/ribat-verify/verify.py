@@ -191,6 +191,15 @@ def main() -> int:
     check("byIso" in html and "MultiPolygon" in html,
           "GeoJSON merges multi-feature economies into one feature each")
 
+    check("preserveDrawingBuffer: true" in html,
+          "map is constructed with a readable back buffer (PNG export)")
+    check("function exportMapPNG(" in html and "'image/png'" in html,
+          "index.html: map PNG export present")
+    check("#ticks span" in html.split("function exportMapPNG(")[-1][:3000],
+          "PNG footer copies the legend's real break values")
+    check("CITATION" in html.split("function exportMapPNG(")[-1][:3000],
+          "PNG footer carries the citation")
+
     # ── result --------------------------------------------------------------
     print()
     for w in WARN:
