@@ -316,7 +316,13 @@ const map = new maplibregl.Map({
   // Keeps the WebGL back buffer readable after a frame so the canvas can be
   // exported. It costs memory on every page load whether or not anyone ever
   // downloads a PNG - the standing price of the feature.
-  preserveDrawingBuffer: true
+  //
+  // MUST be nested. MapLibre v5 moved the context attributes here and IGNORES a
+  // top-level preserveDrawingBuffer silently: the option is accepted, no warning
+  // is raised, and getContextAttributes() still reports false, so the PNG export
+  // captured an empty buffer. Verified against 5.24.0 - top level yields false,
+  // nested yields true.
+  canvasContextAttributes: { preserveDrawingBuffer: true }
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 
