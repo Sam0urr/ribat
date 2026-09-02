@@ -236,6 +236,37 @@ how much of a country's dependency the index actually observes.
 **5.5 Not a forecast.** GPR is a contemporaneous measure of reported risk.
 Intensity is a contemporaneous measure of reported exposure. Neither predicts.
 
+**5.6 How far the source attribution reconciles.** The reverse view decomposes
+an economy's Intensity into bilateral contributions `theta_c * w^c_ij * G_j,t /
+sum_c theta_c`, and the routing Sankey shows each of them as a band. Two
+identities hold, and the interface asserts both, so both are stated here.
+
+*Contributions sum to the attributed share, exactly.* Every band, the per-source
+totals and the `attributedShare` figure are the same sum taken at different
+levels of aggregation, so they agree to floating-point precision. What they do
+*not* sum to is Intensity: the chokepoint channel carries no bilateral source
+(§3.4) and is excluded from the numerator while remaining in the denominator, so
+the attribution falls short by exactly `theta_choke * c_choke_i,t / sum_c
+theta_c`. That residual is displayed as its own figure, marked on the diagram at
+the point where it occurs, and is the quantity by which the Sankey's source
+column ends short of its channel column.
+
+*Attributed plus chokepoint recovers Intensity, to the payload's stored
+precision.* The two are equal in construction but not bit-for-bit in the shipped
+data: `web/data/intensity.json` stores the channel series rounded to two
+decimals, whereas the bilateral weights reconstruct those channels unrounded.
+Measured across 43 economies at several months, the resulting discrepancy is at
+most about 1 part in 10,000 (worst observed: HUN 2005-11, 9.4e-5 relative).
+It is invisible at the one-decimal percentages shown and is a rounding artefact
+of the payload, not a coverage gap: no source is dropped, and the per-channel
+weight blocks reconstruct their channel value to the same tolerance.
+
+Percentages in the routing tooltips use adaptive precision for this reason. At a
+fixed two decimals the smallest of 43 un-pooled sources round to `0.00%`, and the
+displayed contributions then visibly failed to sum to the displayed attributed
+share — a chart whose subject is an unreconciled residual cannot afford a second,
+accidental one.
+
 ---
 
 ## 6. Export contract
