@@ -396,7 +396,15 @@ def main() -> None:
     src_idx = {s: i for i, s in enumerate(src_list)}
     wmap: dict[str, dict] = {}
     blocks = 0
-    for (exp, ch, yr), grp in w_all.groupby(["exposed_iso3", "channel", "year"]):
+    # Key by wyear, the TARGET vintage, not the raw benchmark year. w_all has
+    # been through carry_forward by this point, so wyear is the year a consumer
+    # actually resolves via weight_year_for. The two coincide for trade, energy
+    # and crm and diverge exactly where it matters: TiVA publishes 2022, which
+    # serves the 2023 vintage, and an economy that stopped reporting has its
+    # last year carried forward. Keying by "year" shipped 2022 for va and no
+    # 2023 at all, so a client following weight_year_for found nothing for every
+    # month from 2024 on, and nothing for a stale economy's latest vintage.
+    for (exp, ch, yr), grp in w_all.groupby(["exposed_iso3", "channel", "wyear"]):
         pairs = [[src_idx[r.source_iso3], round(float(r.w), 6)]
                  for r in grp.itertuples() if pd.notna(r.w) and r.w > 0]
         if not pairs:
@@ -409,7 +417,7 @@ def main() -> None:
         "years": [int(y) for y in years],
         "sources": src_list,
         "w": wmap,
-        "note": "w[exposed][channel][weight_year] = [[source index, weight], ...]; source index refers to the 'sources' array. Contribution of source j to exposed country i at month t = theta_c * w^c_ij * G_j,t summed over the channels present here, divided by the sum of theta over ALL channels including chokepoint. Summing over j therefore recovers only the attributable part of Intensity_i,t: it falls short by theta_choke * c_choke_i,t / sum_c theta_c, because the chokepoint weight attaches to a strait, not to a source country. Any interface using this must disclose that residual rather than presenting the attribution as complete.",
+        "note": "w[exposed][channel][weight_year] = [[source index, weight], ...]; source index refers to the 'sources' array. weight_year is the TARGET vintage a month resolves to - the latest year in 'years' strictly before the month's year, or the earliest for months before all of them - not the benchmark year the underlying source published. Every exposed x channel carries all of 'years'. Contribution of source j to exposed country i at month t = theta_c * w^c_ij * G_j,t summed over the channels present here, divided by the sum of theta over ALL channels including chokepoint. Summing over j therefore recovers only the attributable part of Intensity_i,t: it falls short by theta_choke * c_choke_i,t / sum_c theta_c, because the chokepoint weight attaches to a strait, not to a source country. Any interface using this must disclose that residual rather than presenting the attribution as complete.",
         "generated": pd.Timestamp.today().strftime("%Y-%m-%d"),
     }
     wout = WEB / "weights.json"

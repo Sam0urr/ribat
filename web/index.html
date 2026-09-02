@@ -78,6 +78,16 @@
   .metric:last-child{border-bottom:0}
   .metric b{font-family:var(--mono);font-weight:600;font-size:13px}
   .empty{font-size:12px;color:var(--muted);line-height:1.5}
+  /* Source attribution rows. A bar rather than a bare number: the distribution
+     is extremely skewed - one or two partners routinely carry half the total -
+     and a column of percentages hides that shape. */
+  .srcrow{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:11px}
+  .srcrow .nm{flex:0 0 100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .srcrow .bar{flex:1;height:8px;background:#0d1117;border:1px solid var(--line);
+    border-radius:2px;overflow:hidden}
+  .srcrow .bar i{display:block;height:100%}
+  .srcrow .pc{flex:0 0 44px;text-align:right;font-family:var(--mono);color:var(--muted)}
+  .resid{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px}
 
   .ramp{display:flex;height:9px;width:100%;border-radius:2px;overflow:hidden;margin-bottom:5px}
   .ramp i{flex:1}
@@ -116,6 +126,13 @@
     <option value="">Select an economy…</option>
   </select>
 
+  <h2>Map view</h2>
+  <div class="seg" role="group" id="viewSeg">
+    <button id="btnExposure" aria-pressed="true">Exposure borne</button>
+    <button id="btnSources" aria-pressed="false">Risk sources</button>
+  </div>
+  <p class="note" id="viewNote">Exposure: every economy shaded by the risk it bears. Switch to Risk sources and the map inverts - it shades every economy by how much of the <em>selected</em> country's Intensity that economy produces.</p>
+
   <h2>Normalisation</h2>
   <div class="seg" role="group">
     <button id="btnRebased" aria-pressed="true">Rebased</button>
@@ -153,9 +170,10 @@
     <div class="dl">
       <button id="dlCross" type="button">This month, all economies</button>
       <button id="dlSeries" type="button" disabled>Selected economy, all months</button>
+      <button id="dlSources" type="button" disabled>Selected economy, risk sources</button>
       <button id="dlPng" type="button">Map as it appears (PNG)</button>
     </div>
-    <p class="note">Each file carries the view state that produced it, a coverage qualifier per channel, and the CC-BY citation. Chokepoint coverage is blank by construction — the file header says why. GeoJSON covers the cross-section only; the PNG carries the legend and its break values in a footer.</p>
+    <p class="note">The risk-sources file breaks the selected economy's Intensity down by source country for the month on screen, in whichever format is selected above, and states the chokepoint share it cannot attribute. Each file carries the view state that produced it, a coverage qualifier per channel, and the CC-BY citation. Chokepoint coverage is blank by construction — the file header says why. GeoJSON covers the cross-section only; the PNG carries the legend and its break values in a footer.</p>
   </div>
 </div>
 <div class="panel" id="legend">
@@ -198,7 +216,8 @@ const colourFor = t => RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.floor(t *
 const state = {
   months: [], idx: 0, mode: 'rebased', selected: null,
   weights: { trade: 55, energy: 25, crm: 10, choke: 10 },
-  data: null, placeholder: true, kind: 'intensity', basis: 'trade', exportFmt: 'csv'
+  data: null, placeholder: true, kind: 'intensity', basis: 'trade', exportFmt: 'csv',
+  view: 'exposure', rev: { weights: null, gpr: null, error: null, pending: null }
 };
 
 // ---------------------------------------------------------------------------
@@ -297,6 +316,15 @@ function intensityAt(iso, i) {
 const REBASED_BREAKS = [50, 80, 100, 130, 180, 260];
 
 function bucket(v, sorted) {
+  // Reverse view. Percentile bins are wrong here: 43 sources, of which two or
+  // three carry most of the total, so ranking them would paint the 20th and the
+  // 40th largest almost the same colour and imply they matter equally. Fixed
+  // share breaks keep a colour meaning the same thing across months, economies
+  // and mixes, which is the only way the map is comparable to itself.
+  if (state.view === 'sources') {
+    let i = 0; while (i < SHARE_BREAKS.length && v >= SHARE_BREAKS[i]) i++;
+    return i / RAMP.length;
+  }
   if (state.mode === 'rebased' && state.kind === 'gpr_source_side') {
     let i = 0; while (i < REBASED_BREAKS.length && v >= REBASED_BREAKS[i]) i++;
     return i / RAMP.length;
@@ -304,6 +332,172 @@ function bucket(v, sorted) {
   let lo = 0, hi = sorted.length;
   while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; }
   return sorted.length ? lo / sorted.length : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Reverse map: where a country's exposure comes from.
+// ---------------------------------------------------------------------------
+// The forward map answers "who bears risk". This answers "produced by whom",
+// for the selected economy, by attributing its Intensity back over the source
+// countries whose GPR feeds it:
+//
+//   contribution of j to i at t = sum_c theta_c w^c_ij G_j,t / sum_c theta_c
+//
+// The channel mix stays client-side, exactly as it does for the forward map:
+// the weights ship raw, so every slider position re-attributes without another
+// fetch. The sum over j does NOT recover Intensity - the chokepoint channel
+// weights a strait, not a country, so it has no source to attribute to. That
+// residual is disclosed everywhere the attribution is shown: panel, legend,
+// screen-reader table, every export and the PNG footer.
+const SHARE_BREAKS = [0.005, 0.01, 0.02, 0.05, 0.10, 0.20];
+
+function reverseReady() { return !!(state.rev.weights && state.rev.gpr); }
+
+/* Whether the map should actually be painted as an attribution right now:
+   the toggle is on, an exposed economy is selected, and the payloads arrived. */
+function reverseActive() {
+  return state.view === 'sources' && !!state.selected
+      && state.kind === 'intensity_multi' && reverseReady()
+      && !!state.rev.weights.w[state.selected];
+}
+
+/* Both payloads are fetched only when the reverse view is first asked for, so
+   the initial page weight is unchanged for everyone who never opens it.
+   gpr.json is already built and served; weights.json is 274 KB. */
+function loadReverse() {
+  if (reverseReady()) return Promise.resolve(true);
+  // The toggle exists before the map finishes loading. Without this the grid
+  // check below compares against an empty month list and reports a month-grid
+  // mismatch, which is both wrong and alarming.
+  if (!state.months.length) return Promise.resolve(false);
+  if (state.rev.pending) return state.rev.pending;
+  const grab = u => fetch(u, { cache: 'no-store' }).then(r => r.ok ? r.json() : null);
+  const pending = Promise.all([grab('./data/weights.json'), grab('./data/gpr.json')])
+    .then(([w, g]) => {
+      if (!w || w.kind !== 'bilateral_weights') throw new Error('weights.json missing or not a bilateral weight matrix');
+      if (!g || !g.countries) throw new Error('gpr.json missing');
+      // The attribution reads the GPR series at the Intensity month index. If
+      // the two grids ever diverge the arithmetic still runs and returns
+      // plausible nonsense, so refuse rather than silently mis-date every
+      // number on the map.
+      const m = g.months || [];
+      if (m.length !== state.months.length || m[0] !== state.months[0]
+          || m[m.length - 1] !== state.months[state.months.length - 1])
+        throw new Error('gpr.json and intensity.json are on different month grids');
+      state.rev.weights = w; state.rev.gpr = g; state.rev.error = null;
+      return true;
+    })
+    .catch(e => { state.rev.error = (e && e.message) || String(e); return false; })
+    .then(ok => { state.rev.pending = null; return ok; });
+  state.rev.pending = pending;
+  return pending;
+}
+
+/* Weight vintage for a month: the latest benchmark strictly before it, or the
+   earliest for months that precede them all. This mirrors weight_year_for in
+   pipeline/03 exactly - the payload is keyed by the vintage a month resolves
+   to, not by the year the underlying source published. */
+function weightYear(month) {
+  const ys = state.rev.weights.years, y = +String(month).slice(0, 4);
+  const prior = ys.filter(a => a < y);
+  return String(prior.length ? Math.max.apply(null, prior) : Math.min.apply(null, ys));
+}
+
+/* Full attribution for one economy at one month under the current mix.
+   Returns null when the economy has no weight block (VEN is a GPR source but
+   is not itself an exposed economy). */
+function attribution(iso, i) {
+  const W = state.rev.weights, G = state.rev.gpr;
+  const wRec = W.w[iso], rec = state.data.countries[iso];
+  if (!wRec || !rec) return null;
+  const series = rec[state.mode] || {}, th = state.weights;
+  const yr = weightYear(state.months[i]);
+  const attributable = [[state.basis, th.trade], ['energy', th.energy], ['crm', th.crm]];
+
+  // Denominator built exactly as intensityAt builds it - theta summed over the
+  // channels that have a value this month, chokepoint included. Any other
+  // denominator and the shares would not reconcile with the Intensity the rest
+  // of the page is showing.
+  let den = 0;
+  for (const [ch, wt] of attributable.concat([['choke', th.choke]])) {
+    const v = series[ch] && series[ch][i];
+    if (v == null || Number.isNaN(v)) continue;
+    den += wt;
+  }
+  if (!(den > 0)) return null;
+
+  const by = new Map();
+  let attributed = 0;
+  for (const [ch, wt] of attributable) {
+    if (!wt) continue;
+    const v = series[ch] && series[ch][i];
+    if (v == null || Number.isNaN(v)) continue;       // channel absent for this economy
+    const blk = wRec[ch] && wRec[ch][yr];
+    if (!blk) continue;
+    for (const pair of blk) {
+      const sIso = W.sources[pair[0]], g = G.countries[sIso];
+      const gv = g && g[state.mode] && g[state.mode][i];
+      if (gv == null || Number.isNaN(gv)) continue;
+      const c = wt * pair[1] * gv / den;
+      let e = by.get(sIso);
+      if (!e) { e = { iso: sIso, total: 0, ch: {} }; by.set(sIso, e); }
+      e.total += c; e.ch[ch] = (e.ch[ch] || 0) + c;
+      attributed += c;
+    }
+  }
+  const ckv = series.choke && series.choke[i];
+  const residual = (ckv == null || Number.isNaN(ckv)) ? 0 : th.choke * ckv / den;
+  const total = intensityAt(iso, i);
+  const rows = Array.from(by.values()).sort((a, b) => b.total - a.total);
+  const shares = new Map();
+  for (const r of rows) {
+    r.share = total ? r.total / total : 0;
+    shares.set(r.iso, r.share);
+  }
+  return { iso: iso, i: i, year: yr, rows: rows, shares: shares,
+           attributed: attributed, residual: residual,
+           attributedShare: total ? attributed / total : 0,
+           residualShare: total ? residual / total : 0, total: total };
+}
+
+/* Cheap memo. render() paints 241 features and then the panel and the
+   screen-reader table ask for the same attribution again; recomputing it three
+   times per frame is wasteful on the time slider. */
+let revCache = null;
+function currentAttribution() {
+  if (!reverseActive()) return null;
+  const w = state.weights;
+  const key = [state.selected, state.idx, state.mode, state.basis,
+               w.trade, w.energy, w.crm, w.choke].join('|');
+  if (!revCache || revCache.key !== key) revCache = { key: key, val: attribution(state.selected, state.idx) };
+  return revCache.val;
+}
+
+function updateViewNote() {
+  const el = document.getElementById('viewNote');
+  if (!el) return;
+  if (state.view !== 'sources') {
+    el.style.color = '';
+    el.innerHTML = "Exposure: every economy shaded by the risk it bears. Switch to Risk sources and the map inverts - it shades every economy by how much of the <em>selected</em> country's Intensity that economy produces.";
+    return;
+  }
+  if (state.rev.error) {
+    el.style.color = 'var(--warn)';
+    el.textContent = 'Source attribution unavailable: ' + state.rev.error;
+    return;
+  }
+  el.style.color = '';
+  if (!state.selected) { el.textContent = 'Select an economy - on the map or in the list above - to see where its exposure comes from.'; return; }
+  if (!reverseReady()) { el.textContent = 'Loading the bilateral weight matrix…'; return; }
+  const a = currentAttribution();
+  if (!a) {
+    el.textContent = (NAMES[state.selected] || state.selected) + ' is a GPR source but not one of the 43 exposed economies, so it has no attribution of its own.';
+    return;
+  }
+  el.textContent = 'Shading is each economy’s share of ' + (NAMES[a.iso] || a.iso)
+    + '’s Intensity this month. ' + (a.residualShare > 0.0005
+      ? (a.residualShare * 100).toFixed(1) + '% is chokepoint transit, which attaches to a strait rather than a country and is left unattributed.'
+      : 'The chokepoint slider is at zero, so nothing is left unattributed.');
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +571,13 @@ const fmtVal = v => v == null ? '—'
 // GPR is anchored at 100 = each country's own 1985-2023 mean and runs far past
 // it, and Intensity has no natural anchor at all (it is a weighted sum of
 // rebased partner series), so it is binned by percentile. See METHODOLOGY 4.
-function legendModel(sorted) {
+function legendModel(sorted, attr) {
+  if (attr) {
+    return { breaks: SHARE_BREAKS, anchor: null, share: true,
+             unit: 'Share of ' + (NAMES[attr.iso] || attr.iso) + '’s Intensity produced by each source · '
+                 + state.months[state.idx] + ' · ' + (attr.residualShare * 100).toFixed(1)
+                 + '% chokepoint, unattributable' };
+  }
   if (state.mode === 'rebased' && state.kind === 'gpr_source_side') {
     return { breaks: REBASED_BREAKS, anchor: 100,
              unit: 'GPR index · 100 = country\u2019s own 1985–2023 mean' };
@@ -392,15 +592,35 @@ function legendModel(sorted) {
            unit: `${what} (${state.mode}) · percentile bins, breaks for ${state.months[state.idx]}` };
 }
 
-function updateLegend(sorted) {
-  const { breaks, anchor, unit } = legendModel(sorted);
+function updateLegend(sorted, attr) {
+  const { breaks, anchor, unit, share } = legendModel(sorted, attr);
+  const fmtBreak = b => b == null ? ''
+    : share ? (b * 100 < 1 ? (b * 100).toFixed(1) : String(Math.round(b * 100))) + '%'
+    : state.mode === 'rebased' ? Math.round(b) : (+b).toFixed(2);
   document.getElementById('ticks').innerHTML = breaks.map((b, i) =>
-    `<span class="${anchor != null && b === anchor ? 'anchor' : ''}" style="left:${(i + 1) / RAMP.length * 100}%">${
-      b == null ? '' : (state.mode === 'rebased' ? Math.round(b) : (+b).toFixed(2))}</span>`).join('');
+    `<span class="${anchor != null && b === anchor ? 'anchor' : ''}" style="left:${(i + 1) / RAMP.length * 100}%">${fmtBreak(b)}</span>`).join('');
   document.getElementById('legendUnit').textContent = unit;
 }
 
-function updateSrTable(rows) {
+function updateSrTable(rows, attr) {
+  // The reverse view is a different table, not the same one re-sorted: the
+  // column is a share of one economy's total, and the residual has to appear
+  // or the percentages read as though they sum to 100.
+  if (attr) {
+    const nm = NAMES[attr.iso] || attr.iso;
+    document.getElementById('srTable').innerHTML =
+      `<table><caption>Sources of ${nm}’s Intensity (${state.mode}), ${state.months[state.idx]}. `
+      + `${attr.rows.length} source economies, largest first. `
+      + `${(attr.residualShare * 100).toFixed(1)}% is chokepoint transit and is not attributable to a source country.`
+      + `</caption><thead><tr><th scope="col">Rank</th><th scope="col">Source economy</th>`
+      + `<th scope="col">Share of ${nm}’s Intensity</th><th scope="col">Contribution</th></tr></thead><tbody>`
+      + attr.rows.map((r, i) => `<tr><td>${i + 1}</td><th scope="row">${NAMES[r.iso] || r.iso}</th>`
+          + `<td>${(r.share * 100).toFixed(2)}%</td><td>${fmtVal(r.total)}</td></tr>`).join('')
+      + `<tr><td></td><th scope="row">Chokepoint transit (no source country)</th>`
+      + `<td>${(attr.residualShare * 100).toFixed(2)}%</td><td>${fmtVal(attr.residual)}</td></tr>`
+      + `</tbody></table>`;
+    return;
+  }
   const label = state.kind === 'gpr_source_side' ? 'GPR' : 'Intensity';
   document.getElementById('srTable').innerHTML =
     `<table><caption>${label} (${state.mode}) by economy, ${state.months[state.idx]}. `
@@ -414,20 +634,27 @@ function updateSrTable(rows) {
 
 function render() {
   syncExportUI();
+  updateViewNote();
   if (!world) return;
+  // One value function for both views. In the reverse view the selected economy
+  // itself has no entry - a country is not its own source - so it falls to the
+  // no-data fill and is identified by the selection outline instead.
+  const attr = currentAttribution();
+  const valueOf = iso => attr ? (attr.shares.has(iso) ? attr.shares.get(iso) : null) : intensity(iso);
+
   const sorted = world.features
-    .map(f => f.properties.iso3 && intensity(f.properties.iso3))
+    .map(f => f.properties.iso3 && valueOf(f.properties.iso3))
     .filter(v => v != null).sort((a, b) => a - b);
 
   for (const f of world.features) {
-    const v = f.properties.iso3 && intensity(f.properties.iso3);
+    const v = f.properties.iso3 && valueOf(f.properties.iso3);
     map.setFeatureState({ source: 'countries', id: f.id }, { colour: v == null ? '#1c222b' : colourFor(bucket(v, sorted)) });
   }
   document.getElementById('monthLabel').textContent = state.months[state.idx] || '—';
-  updateLegend(sorted);
+  updateLegend(sorted, attr);
   updateSrTable(world.features.map(f => f.properties.iso3).filter(Boolean)
     .map(i => ({ i, v: intensity(i) })).filter(o => o.v != null)
-    .sort((a, b) => b.v - a.v));
+    .sort((a, b) => b.v - a.v), attr);
   if (state.selected) detail(state.selected);
 }
 
@@ -435,9 +662,21 @@ function select(iso) {
   if (!iso) return;
   state.selected = iso;
   map.setFilter('sel', ['==', 'iso3', iso]);
-  detail(iso);
   const sel = document.getElementById('countrySel');
   if (sel.value !== iso) sel.value = iso;
+  // In the reverse view the selection IS the map, so a new selection repaints
+  // everything rather than only the panel.
+  if (state.view === 'sources') render(); else { syncExportUI(); detail(iso); }
+  const a = currentAttribution();
+  if (a) {
+    const top = a.rows[0];
+    document.getElementById('liveRegion').textContent =
+      `Sources of ${NAMES[iso] || iso}’s Intensity, ${state.months[state.idx]}: `
+      + `${a.rows.length} source economies`
+      + (top ? `, largest ${NAMES[top.iso] || top.iso} at ${(top.share * 100).toFixed(1)}%` : '')
+      + `; ${(a.residualShare * 100).toFixed(0)}% chokepoint, unattributable.`;
+    return;
+  }
   const label = state.kind === 'gpr_source_side' ? 'GPR' : 'Intensity';
   document.getElementById('liveRegion').textContent =
     `${NAMES[iso] || iso}, ${state.months[state.idx]}: ${label} (${state.mode}) `
@@ -584,6 +823,45 @@ function stackSVG(iso) {
     + `</p>`;
 }
 
+/* Reverse-view panel. Deliberately not a variant of the exposure panel: it
+   answers a different question, in different units, and the number that must
+   not be lost - the unattributable chokepoint share - has no counterpart there.
+   The bars are coloured by the same ramp buckets as the map, so a country's
+   colour on screen and its bar in the list are the same statement. */
+function detailSources(iso) {
+  const el = document.getElementById('detail');
+  if (!reverseReady()) {
+    el.innerHTML = `<h3>${NAMES[iso] || iso}</h3><p class="empty">${state.rev.error
+      ? 'Source attribution unavailable: ' + xesc(state.rev.error)
+      : 'Loading the bilateral weight matrix…'}</p>`;
+    return;
+  }
+  const a = currentAttribution();
+  if (!a) {
+    el.innerHTML = `<h3>${NAMES[iso] || iso}</h3><p class="empty">${NAMES[iso] || iso} is one of the 44 GPR source countries but not one of the 43 exposed economies, so no dependency weights were built for it. It can appear as a source of someone else’s exposure, not as a bearer of its own.</p>`;
+    return;
+  }
+  const num = v => state.mode === 'rebased' ? v.toFixed(1) : v.toFixed(3);
+  const shown = a.rows.slice(0, 15);
+  const rest = a.rows.length - shown.length;
+  const restSum = a.rows.slice(shown.length).reduce((t, r) => t + r.share, 0);
+  const bar = r => `<div class="srcrow"><span class="nm" title="${xesc(NAMES[r.iso] || r.iso)}">${NAMES[r.iso] || r.iso}</span>`
+    + `<span class="bar"><i style="width:${Math.max(1, Math.min(100, r.share / (a.rows[0].share || 1) * 100)).toFixed(1)}%;background:${colourFor(bucket(r.share, null))}"></i></span>`
+    + `<span class="pc">${(r.share * 100).toFixed(1)}%</span></div>`;
+  el.innerHTML = `
+    <h3>${NAMES[iso] || iso}</h3>
+    <div class="iso">${iso} · ${state.months[state.idx]} · where its Intensity comes from, your channel mix</div>
+    <div class="metric"><span><b>Intensity</b></span><b>${a.total == null ? '—' : num(a.total)}</b></div>
+    <div class="metric"><span>Attributed to source countries</span><b>${(a.attributedShare * 100).toFixed(1)}%</b></div>
+    <div class="metric"><span style="color:var(--warn)">Chokepoint, unattributable</span><b style="color:var(--warn)">${(a.residualShare * 100).toFixed(1)}%</b></div>
+    <h2 style="margin-top:14px">Source countries</h2>
+    ${shown.map(bar).join('')}
+    ${rest > 0 ? `<p class="cap">+ ${rest} smaller sources, ${(restSum * 100).toFixed(1)}% between them. The risk-sources download carries all ${a.rows.length}.</p>` : ''}
+    <p class="cap" style="margin-top:12px">Shares are of this economy’s Intensity, not of the attributed part, so they sum to ${(a.attributedShare * 100).toFixed(1)}% and the chokepoint residual makes up the rest. Chokepoint transit weights a strait rather than a country and cannot be traced to a source (METHODOLOGY.md 3.4).</p>
+    <p class="cap">Dependency weights: ${a.year} benchmark vintage, applied to ${state.months[state.idx]} GPR.</p>
+    ${state.data.stale_weights?.[iso] ? `<p class="cap" style="color:var(--warn)">Stopped reporting to Comtrade after ${state.data.stale_weights[iso]}; weights carried forward from that year and increasingly unrepresentative.</p>` : ''}`;
+}
+
 function detail(iso) {
   const rec = state.data.countries[iso];
   const el = document.getElementById('detail');
@@ -591,6 +869,7 @@ function detail(iso) {
     el.innerHTML = `<h3>${iso}</h3><p class="empty">No GPR-weighted exposure computed. Either the country is outside the 44-country GPR source set, or its dependency weights have not been built yet.</p>`;
     return;
   }
+  if (state.view === 'sources' && state.kind === 'intensity_multi') return detailSources(iso);
   if (state.kind === 'intensity_multi') {
     const total = intensity(iso);
     const srcs = state.data.top_sources?.[iso] || [];
@@ -791,6 +1070,98 @@ function toGeoJSON() {
   return JSON.stringify({ type: 'FeatureCollection', metadata: meta, features: features });
 }
 
+/* Source-attribution export. A file that named an Intensity and then carried
+   contributions summing to less than it would be read as a rounding error
+   rather than a disclosed limit, so the chokepoint residual travels as its own
+   labelled row and row_type says which kind of row you are looking at. The
+   contribution column then sums to the Intensity in the metadata, exactly. */
+const REV_COLS = ['row_type', 'source_iso3', 'source_name', 'exposed_iso3', 'exposed_name',
+                  'month', 'contribution', 'share_of_intensity',
+                  'c_trade', 'c_va', 'c_energy', 'c_crm', 'weight_year'];
+
+function revMeta(a, scope) {
+  const nm = NAMES[a.iso] || a.iso;
+  return exportMeta(scope).concat([
+    ['attribution', 'contribution of source j = sum_c theta_c * w^c_ij * G_j,t / sum_c theta_c, '
+      + 'where w is the bilateral dependency weight of the ' + a.year + ' benchmark vintage and G is source-country GPR. '
+      + 'Recomputed from web/data/weights.json and web/data/gpr.json; both ship with this site.'],
+    ['intensity_total', a.total == null ? '' : a.total.toFixed(6)],
+    ['attributed_share', a.attributedShare.toFixed(6)],
+    ['unattributed_choke_share', a.residualShare.toFixed(6)
+      + ' - the chokepoint channel weights a strait, not a country, so this share of ' + nm
+      + '’s Intensity has no source country. It is carried as the row_type=unattributed row, not dropped.'],
+    ['weight_vintage', String(a.year) + ' benchmark, applied to ' + state.months[a.i] + ' GPR (METHODOLOGY.md 5.3)'],
+  ]);
+}
+
+function revRows(a) {
+  const num = x => (x == null || Number.isNaN(x)) ? '' : x.toFixed(6);
+  const month = state.months[a.i], exNm = NAMES[a.iso] || a.iso;
+  const rows = a.rows.map(r => ({
+    row_type: 'source', source_iso3: r.iso, source_name: NAMES[r.iso] || r.iso,
+    exposed_iso3: a.iso, exposed_name: exNm, month: month,
+    contribution: num(r.total), share_of_intensity: num(r.share),
+    c_trade: num(r.ch.trade), c_va: num(r.ch.va), c_energy: num(r.ch.energy), c_crm: num(r.ch.crm),
+    weight_year: String(a.year),
+  }));
+  rows.push({
+    row_type: 'unattributed', source_iso3: '', source_name: 'Chokepoint transit (no source country)',
+    exposed_iso3: a.iso, exposed_name: exNm, month: month,
+    contribution: num(a.residual), share_of_intensity: num(a.residualShare),
+    c_trade: '', c_va: '', c_energy: '', c_crm: '', weight_year: String(a.year),
+  });
+  return rows;
+}
+
+function toCSVRev(a, scope) {
+  const head = revMeta(a, scope).map(kv => '# ' + kv[0] + ': ' + kv[1]).join('\n');
+  const body = [REV_COLS.join(',')].concat(
+    revRows(a).map(r => REV_COLS.map(c => csvCell(String(r[c] == null ? '' : r[c]))).join(',')));
+  return head + '\n#\n' + body.join('\n') + '\n';
+}
+
+function toJSONRev(a, scope) {
+  const meta = {};
+  for (const kv of revMeta(a, scope)) meta[kv[0]] = kv[1];
+  return JSON.stringify({ meta: meta, columns: REV_COLS, rows: revRows(a) }, null, 2);
+}
+
+/* GeoJSON of the attribution: one feature per SOURCE country. The residual has
+   no geometry - it belongs to a strait, not a country - so it cannot be a
+   feature and rides in the metadata and on every feature instead, where a
+   parser that drops foreign members still cannot lose it. */
+function toGeoJSONRev(a, scope) {
+  if (typeof world === 'undefined' || !world || !world.features) return null;
+  const meta = {};
+  for (const kv of revMeta(a, scope)) meta[kv[0]] = kv[1];
+  const rows = new Map(revRows(a).filter(r => r.row_type === 'source').map(r => [r.source_iso3, r]));
+  const byIso = new Map();
+  for (const f of world.features) {
+    const iso = f.properties && f.properties.iso3, g = f.geometry;
+    if (!iso || !rows.has(iso) || !g) continue;
+    const polys = g.type === 'MultiPolygon' ? g.coordinates
+                : g.type === 'Polygon' ? [g.coordinates] : [];
+    if (!polys.length) continue;
+    if (byIso.has(iso)) byIso.get(iso).polys.push(...polys);
+    else byIso.set(iso, { id: f.id, polys: polys.slice() });
+  }
+  const features = [];
+  for (const [iso, ent] of byIso) {
+    const row = rows.get(iso), props = {};
+    for (const c of REV_COLS) {
+      const v = row[c];
+      props[c] = (v === '' || v == null) ? null
+        : (['row_type', 'source_iso3', 'source_name', 'exposed_iso3', 'exposed_name', 'month', 'weight_year'].includes(c) ? v : Number(v));
+    }
+    props.unattributed_choke_share = Number(a.residualShare.toFixed(6));
+    props.attribution = CITATION;
+    features.push({ type: 'Feature', id: ent.id, properties: props,
+                    geometry: { type: 'MultiPolygon', coordinates: ent.polys } });
+  }
+  if (!features.length) return null;
+  return JSON.stringify({ type: 'FeatureCollection', metadata: meta, features: features });
+}
+
 function saveBlob(name, blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -806,7 +1177,31 @@ function saveFile(name, text, mime) {
 
 function doExport(which) {
   let rows, scope, stem;
+  const live = m => { document.getElementById('liveRegion').textContent = m; };
   const last = state.months[state.months.length - 1];
+  // Offered whenever an economy is selected, not only while the reverse view is
+  // open: someone who has found the country they care about should not have to
+  // discover a toggle to get its numbers. The payloads load on demand.
+  if (which === 'sources') {
+    const iso = state.selected;
+    if (!iso) return;
+    loadReverse().then(ok => {
+      if (!ok) { live('Source attribution unavailable: ' + state.rev.error); return; }
+      const a = attribution(iso, state.idx);
+      if (!a) { live((NAMES[iso] || iso) + ' is a GPR source but not an exposed economy, so it has no source attribution.'); return; }
+      const month = state.months[state.idx];
+      const sc = 'source attribution - ' + (NAMES[iso] || iso) + ' (' + iso + ') at ' + month
+               + ', by source country, under the channel mix on screen';
+      const st = 'ribat_' + iso + '_sources_' + month;
+      if (state.exportFmt === 'geo') {
+        const gj = toGeoJSONRev(a, sc);
+        if (!gj) { live('Map geometry has not finished loading; GeoJSON is unavailable.'); return; }
+        saveFile(st + '.geojson', gj, 'application/geo+json');
+      } else if (state.exportFmt === 'json') saveFile(st + '.json', toJSONRev(a, sc), 'application/json');
+      else saveFile(st + '.csv', toCSVRev(a, sc), 'text/csv');
+    });
+    return;
+  }
   if (which === 'cross' && state.exportFmt === 'geo') {
     const gj = toGeoJSON();
     if (!gj) {
@@ -843,6 +1238,9 @@ function syncExportUI() {
   // GeoJSON is a cross-section format; a per-month geometry series is refused
   // rather than silently emitted as 500 copies of one polygon.
   document.getElementById('dlSeries').disabled = !state.selected || state.exportFmt === 'geo';
+  // Unlike the time series, this one has a meaning in all three formats: it is
+  // a cross-section over source countries, so geometry applies.
+  document.getElementById('dlSources').disabled = !state.selected;
 }
 
 /* Chart export. The panel SVGs are styled by the page: CSS custom properties
@@ -992,7 +1390,15 @@ function exportMapPNG() {
     if (cur) out.push(cur);
     return out;
   };
-  const caution = wrap('Contemporaneous measure of reported exposure, not a forecast. '
+  const attrPng = (typeof currentAttribution === 'function') ? currentAttribution() : null;
+  const caution = wrap((attrPng
+      ? 'Shading is each economy’s share of ' + (NAMES[attrPng.iso] || attrPng.iso)
+        + '’s Intensity, not the risk it bears itself. '
+        + (attrPng.residualShare * 100).toFixed(1) + '% of that Intensity is chokepoint transit, '
+        + 'which weights a strait rather than a country and is left unattributed; '
+        + (NAMES[attrPng.iso] || attrPng.iso) + ' is outlined and is not a source of itself. '
+      : '')
+    + 'Contemporaneous measure of reported exposure, not a forecast. '
     + 'The channel mix is a sensitivity analysis, not a ranking. '
     + 'Coverage varies by economy; the data export reports it per channel.');
   const attrib = wrap((location.host || 'sam0urr.github.io') + ' · downloaded '
@@ -1008,7 +1414,10 @@ function exportMapPNG() {
 
   const top = src.height;
   g.textAlign = 'left'; g.fillStyle = V('ink'); g.font = font(15, '600');
-  g.fillText('Ribat — Intensity (' + state.mode + '), ' + state.months[state.idx], P, top + 26 * S);
+  g.fillText(attrPng
+    ? 'Ribat — sources of ' + (NAMES[attrPng.iso] || attrPng.iso) + '’s Intensity ('
+      + state.mode + '), ' + state.months[state.idx]
+    : 'Ribat — Intensity (' + state.mode + '), ' + state.months[state.idx], P, top + 26 * S);
   g.fillStyle = V('muted'); g.font = font(10);
   g.fillText(mix, P, top + 41 * S);
 
@@ -1029,7 +1438,7 @@ function exportMapPNG() {
   for (const line of attrib) { y += LH; g.fillText(line, P, y); }
 
   out.toBlob(b => {
-    if (b) saveBlob('ribat_map_' + state.months[state.idx] + '.png', b);
+    if (b) saveBlob((attrPng ? 'ribat_' + attrPng.iso + '_sources_' : 'ribat_map_') + state.months[state.idx] + '.png', b);
     else document.getElementById('liveRegion').textContent = 'PNG encoding failed.';
   }, 'image/png');
 }
@@ -1047,6 +1456,7 @@ document.getElementById('btnJSON').onclick = () => setFmt('json');
 document.getElementById('btnGeo').onclick = () => setFmt('geo');
 document.getElementById('dlCross').onclick = () => doExport('cross');
 document.getElementById('dlSeries').onclick = () => doExport('series');
+document.getElementById('dlSources').onclick = () => doExport('sources');
 
 function setMode(m) {
   state.mode = m;
@@ -1069,6 +1479,17 @@ function setBasis(b) {
   document.getElementById('btnVA').setAttribute('aria-pressed', b === 'va');
   render();
 }
+function setView(v) {
+  state.view = v;
+  document.getElementById('btnExposure').setAttribute('aria-pressed', v === 'exposure');
+  document.getElementById('btnSources').setAttribute('aria-pressed', v === 'sources');
+  updateViewNote();
+  if (v === 'sources' && !reverseReady()) { loadReverse().then(render); return; }
+  render();
+}
+document.getElementById('btnExposure').onclick = () => setView('exposure');
+document.getElementById('btnSources').onclick = () => setView('sources');
+
 document.getElementById('btnGross').onclick = () => setBasis('trade');
 document.getElementById('btnVA').onclick = () => setBasis('va');
 
