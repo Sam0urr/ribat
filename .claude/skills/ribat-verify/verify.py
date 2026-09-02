@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[3]
 FAIL: list[str] = []
 WARN: list[str] = []
 
-KNOWN_KINDS = {"gpr_source_side", "intensity_trade", "intensity_multi"}
+KNOWN_KINDS = {"gpr_source_side", "intensity_trade", "intensity_multi", "bilateral_weights"}
 EXPECTED_GPR_SOURCES = 44
 MIN_EXPOSED = 40
 MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
@@ -58,6 +58,7 @@ def main() -> int:
               + ("" if r.returncode == 0 else f": {r.stderr.strip().splitlines()[0]}"))
 
     # 3 ── payload contracts -------------------------------------------------
+    EXPOSED_SEEN: set[str] = set()
     section("payloads")
     for p in sorted((ROOT / "web" / "data").glob("*.json")):
         if "countries-50m" in p.name:
@@ -65,6 +66,42 @@ def main() -> int:
         d = json.loads(p.read_text(encoding="utf-8"))
         kind = d.get("kind")
         check(kind in KNOWN_KINDS, f"{p.name}: kind={kind!r} recognised")
+
+        # The bilateral weight matrix has no month grid: weights are per
+        # benchmark vintage, and the month dimension arrives from gpr.json at
+        # render time. Check what it actually claims instead.
+        if kind == "bilateral_weights":
+            srcs = d.get("sources") or []
+            check(bool(srcs) and all(ISO_RE.match(x) for x in srcs),
+                  f"{p.name}: {len(srcs)} source ISO3 codes")
+            check(bool(d.get("years")) and all(isinstance(y, int) for y in d["years"]),
+                  f"{p.name}: benchmark years are integers {d.get('years')}")
+            check("choke" not in (d.get("channels") or []),
+                  f"{p.name}: chokepoint absent (no bilateral source attribution)")
+            bad_idx = bad_w = bad_iso = 0
+            for iso, per_ch in (d.get("w") or {}).items():
+                if not ISO_RE.match(iso):
+                    bad_iso += 1
+                for ch, per_yr in per_ch.items():
+                    if ch not in (d.get("channels") or []):
+                        bad_iso += 1
+                    for pairs in per_yr.values():
+                        for pair in pairs:
+                            if not (isinstance(pair, list) and len(pair) == 2
+                                    and 0 <= pair[0] < len(srcs)):
+                                bad_idx += 1
+                            elif not (0 < float(pair[1]) <= 1.0):
+                                bad_w += 1
+            check(bad_idx == 0, f"{p.name}: every source index is in range")
+            check(bad_w == 0, f"{p.name}: every weight lies in (0, 1]")
+            check(bad_iso == 0, f"{p.name}: ISO3 keys and declared channels only")
+            if EXPOSED_SEEN:
+                missing = EXPOSED_SEEN - set(d.get("w") or {})
+                check(not missing,
+                      f"{p.name}: covers every exposed economy in intensity.json"
+                      + ("" if not missing else " -> missing " + ", ".join(sorted(missing)[:5])))
+            continue
+
         months = d.get("months", [])
         check(bool(months) and all(MONTH_RE.match(m) for m in months),
               f"{p.name}: months are YYYY-MM ({len(months)})")
@@ -114,6 +151,7 @@ def main() -> int:
             check(len(d["countries"]) == EXPECTED_GPR_SOURCES,
                   f"{p.name}: {len(d['countries'])} GPR source series (expect {EXPECTED_GPR_SOURCES})")
         elif kind and kind.startswith("intensity"):
+            EXPOSED_SEEN.update(d.get("countries", {}))
             check(len(d["countries"]) >= MIN_EXPOSED,
                   f"{p.name}: {len(d['countries'])} exposed economies (expect >= {MIN_EXPOSED})")
 
@@ -191,6 +229,19 @@ def main() -> int:
     check("byIso" in html and "MultiPolygon" in html,
           "GeoJSON merges multi-feature economies into one feature each")
 
+    # data/processed/ is gitignored and the refresh runs in CI, so a working tree
+    # can rebuild a shorter payload from older inputs without saying so.
+    section("pipeline guards")
+    p3 = (ROOT / "pipeline" / "03_build_intensity.py")
+    src3 = p3.read_text(encoding="utf-8") if p3.exists() else ""
+    check("def guard_no_regression(" in src3,
+          "03 refuses to overwrite a richer payload with a poorer one")
+    check("--allow-regression" in src3,
+          "03 offers an explicit override for intended shrinkage")
+    check("sys.exit(1)" in src3,
+          "03 exits non-zero when it refuses, so CI cannot ignore it")
+
+    section("export contract (map)")
     # The v4 spelling passes this file's eye but not MapLibre's: v5 ignores a
     # top-level preserveDrawingBuffer silently. Require the nested form, which is
     # the one that actually reaches the GL context.

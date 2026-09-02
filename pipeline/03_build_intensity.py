@@ -36,6 +36,7 @@ Output: data/processed/intensity_monthly.csv
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -136,9 +137,103 @@ def carry_forward(w: pd.DataFrame, years: list[int]) -> tuple[pd.DataFrame, dict
     return pd.concat(blocks, ignore_index=True), stale
 
 
+def load_gpr() -> pd.DataFrame:
+    """Load the monthly country GPR panel from the freshest pinned source.
+
+    data/raw and data/processed are both gitignored and the refresh runs in CI,
+    so a clone has neither the workbook nor the processed CSV. web/data/gpr.json
+    is tracked, carries the same `recent` variant this script consumes, and is
+    versioned alongside the payload it produced - so it pins the GPR vintage that
+    built any given commit. Reading it makes
+
+        git checkout <sha> && python3 pipeline/03_build_intensity.py
+
+    reproduce that commit's payload from a clean clone, with nothing extra
+    committed. It also sidesteps upstream revision: the workbook is republished
+    in place each month with recent months revised, so re-downloading reproduces
+    today's numbers, not a past commit's.
+
+    The processed CSV wins when it is at least as current; otherwise gpr.json
+    does, and says so.
+    """
+    csv_path, json_path = PROC / "gpr_country_monthly.csv", WEB / "gpr.json"
+
+    csv_df = None
+    if csv_path.exists():
+        df = pd.read_csv(csv_path, parse_dates=["month"])
+        csv_df = df[(df["variant"] == "recent") & (df["month"].dt.year >= START_YEAR)]
+
+    json_df = None
+    if json_path.exists():
+        d = json.loads(json_path.read_text())
+        months = pd.to_datetime(d.get("months") or [])
+        rows = []
+        for iso, rec in (d.get("countries") or {}).items():
+            lvl, reb = rec.get("level") or [], rec.get("rebased") or []
+            for i, m in enumerate(months):
+                a = lvl[i] if i < len(lvl) else None
+                b = reb[i] if i < len(reb) else None
+                if a is None and b is None:
+                    continue
+                rows.append((m, a, iso, "recent", b))
+        if rows:
+            json_df = pd.DataFrame(
+                rows, columns=["month", "gpr", "iso3", "variant", "gpr_rebased"])
+            json_df = json_df[json_df["month"].dt.year >= START_YEAR]
+
+    def last(df):
+        return None if df is None or df.empty else df["month"].max()
+
+    lc, lj = last(csv_df), last(json_df)
+    if csv_df is not None and (lj is None or lc >= lj):
+        print(f"GPR source: {csv_path.name} (through {str(lc)[:7]})")
+        return csv_df
+    if json_df is not None:
+        why = "no processed CSV" if csv_df is None else f"CSV only reaches {str(lc)[:7]}"
+        print(f"GPR source: web/data/gpr.json (through {str(lj)[:7]}) — {why}")
+        return json_df
+    raise SystemExit(
+        "No GPR panel found. Expected data/processed/gpr_country_monthly.csv "
+        "(run 01_load_gpr.py against the workbook) or the tracked web/data/gpr.json."
+    )
+
+
+def guard_no_regression(payload: dict, out: Path) -> list[str]:
+    """Report ways `payload` is poorer than the payload already at `out`.
+
+    data/processed/ is gitignored and the monthly refresh runs in CI, so a
+    working tree can easily hold GPR inputs older than the committed payload.
+    Rebuilding from those inputs silently drops months: the run looks clean, the
+    file shrinks, and nothing says so. This makes that loud.
+
+    Pass --allow-regression when a shorter grid is the intended result, e.g. an
+    upstream revision genuinely withdrew months.
+    """
+    if not out.exists():
+        return []
+    try:
+        old = json.loads(out.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    bad = []
+    om, nm = old.get("months") or [], payload.get("months") or []
+    if om and nm:
+        if nm[-1] < om[-1]:
+            bad.append(f"last month goes backwards: {om[-1]} -> {nm[-1]}")
+        if len(nm) < len(om):
+            bad.append(f"month count shrinks: {len(om)} -> {len(nm)}")
+    oc, nc = len(old.get("countries") or {}), len(payload.get("countries") or {})
+    if nc < oc:
+        bad.append(f"exposed economies shrink: {oc} -> {nc}")
+    ochs, nchs = set(old.get("channels") or []), set(payload.get("channels") or [])
+    missing = ochs - nchs
+    if missing:
+        bad.append("channels disappear: " + ", ".join(sorted(missing)))
+    return bad
+
+
 def main() -> None:
-    gpr = pd.read_csv(PROC / "gpr_country_monthly.csv", parse_dates=["month"])
-    gpr = gpr[(gpr["variant"] == "recent") & (gpr["month"].dt.year >= START_YEAR)]
+    gpr = load_gpr()
     months = sorted(gpr["month"].unique())
 
     # ---- assemble long weight table: one row per (i, j, year, channel) -----
@@ -265,10 +360,62 @@ def main() -> None:
     }
     WEB.mkdir(parents=True, exist_ok=True)
     out = WEB / "intensity.json"
+    regressions = guard_no_regression(payload, out)
+    if regressions and "--allow-regression" not in sys.argv:
+        print("\nREFUSING TO WRITE — the rebuild is poorer than the payload on disk:")
+        for r in regressions:
+            print(f"  - {r}")
+        print("\nThe usual cause is stale inputs: data/processed/ is gitignored and the\n"
+              "monthly refresh runs in CI, so this tree may hold an older GPR download\n"
+              "than the committed payload. Re-run 01_load_gpr.py against a current\n"
+              "workbook, or pass --allow-regression if the shorter grid is intended.")
+        sys.exit(1)
+    if regressions:
+        print("WARNING overriding regression checks: " + "; ".join(regressions))
     out.write_text(json.dumps(payload, separators=(",", ":")))
     kb = out.stat().st_size // 1024
     print(f"wrote {out}  ({len(countries)} economies x {len(months)} months x "
           f"{len(channels)} channels, {kb} KB)")
+
+    # ---- bilateral weight payload (reverse map) ----------------------------
+    # To attribute a country's Intensity back to the sources producing it, the
+    # interface needs w^c_ij itself. Shipping weights rather than precomputed
+    # contributions keeps the channel mix client-side, exactly as the main
+    # payload does:
+    #     contribution of j to i at t = sum_c theta_c w^c_ij G_j,t / sum_c theta_c
+    # Summing over j recovers the ATTRIBUTABLE part of Intensity_i,t, not all of
+    # it: chokepoint carries no bilateral source, so the attribution falls short
+    # by theta_choke * c_choke_i,t / sum_c theta_c whenever that slider is above
+    # zero. The interface must show that residual. Loaded lazily, so the initial
+    # page weight is unchanged.
+    #
+    # The chokepoint channel is absent by construction: its weight attaches to a
+    # strait, not to a source country, so it cannot be attributed here and the
+    # interface must disclose the share it leaves unexplained.
+    src_list = sorted(w_all["source_iso3"].unique())
+    src_idx = {s: i for i, s in enumerate(src_list)}
+    wmap: dict[str, dict] = {}
+    blocks = 0
+    for (exp, ch, yr), grp in w_all.groupby(["exposed_iso3", "channel", "year"]):
+        pairs = [[src_idx[r.source_iso3], round(float(r.w), 6)]
+                 for r in grp.itertuples() if pd.notna(r.w) and r.w > 0]
+        if not pairs:
+            continue
+        wmap.setdefault(exp, {}).setdefault(ch, {})[str(int(yr))] = pairs
+        blocks += 1
+    wpay = {
+        "kind": "bilateral_weights",
+        "channels": sorted(w_all["channel"].unique()),
+        "years": [int(y) for y in years],
+        "sources": src_list,
+        "w": wmap,
+        "note": "w[exposed][channel][weight_year] = [[source index, weight], ...]; source index refers to the 'sources' array. Contribution of source j to exposed country i at month t = theta_c * w^c_ij * G_j,t summed over the channels present here, divided by the sum of theta over ALL channels including chokepoint. Summing over j therefore recovers only the attributable part of Intensity_i,t: it falls short by theta_choke * c_choke_i,t / sum_c theta_c, because the chokepoint weight attaches to a strait, not to a source country. Any interface using this must disclose that residual rather than presenting the attribution as complete.",
+        "generated": pd.Timestamp.today().strftime("%Y-%m-%d"),
+    }
+    wout = WEB / "weights.json"
+    wout.write_text(json.dumps(wpay, separators=(",", ":")))
+    print(f"wrote {wout}  ({len(wmap)} exposed x {len(src_list)} sources, "
+          f"{blocks} vintage blocks, {wout.stat().st_size // 1024} KB)")
 
     show = intens[(intens["month"] == last)]
     for ch in channels:
