@@ -323,8 +323,11 @@ def main() -> None:
     # contributions keeps the channel mix client-side, exactly as the main
     # payload does:
     #     contribution of j to i at t = sum_c theta_c w^c_ij G_j,t / sum_c theta_c
-    # which sums over j to Intensity_i,t. Loaded lazily by the front end, so the
-    # initial page weight is unchanged.
+    # Summing over j recovers the ATTRIBUTABLE part of Intensity_i,t, not all of
+    # it: chokepoint carries no bilateral source, so the attribution falls short
+    # by theta_choke * c_choke_i,t / sum_c theta_c whenever that slider is above
+    # zero. The interface must show that residual. Loaded lazily, so the initial
+    # page weight is unchanged.
     #
     # The chokepoint channel is absent by construction: its weight attaches to a
     # strait, not to a source country, so it cannot be attributed here and the
@@ -346,11 +349,7 @@ def main() -> None:
         "years": [int(y) for y in years],
         "sources": src_list,
         "w": wmap,
-        "note": "w[exposed][channel][weight_year] = [[source index, weight], ...]; "
-                "source index refers to the 'sources' array. Contribution of source j "
-                "to exposed country i at month t = sum_c theta_c * w^c_ij * G_j,t / "
-                "sum_c theta_c, summing over j to Intensity_i,t. The chokepoint channel "
-                "is not present: its weight attaches to a strait, not a source country.",
+        "note": "w[exposed][channel][weight_year] = [[source index, weight], ...]; source index refers to the 'sources' array. Contribution of source j to exposed country i at month t = theta_c * w^c_ij * G_j,t summed over the channels present here, divided by the sum of theta over ALL channels including chokepoint. Summing over j therefore recovers only the attributable part of Intensity_i,t: it falls short by theta_choke * c_choke_i,t / sum_c theta_c, because the chokepoint weight attaches to a strait, not to a source country. Any interface using this must disclose that residual rather than presenting the attribution as complete.",
         "generated": pd.Timestamp.today().strftime("%Y-%m-%d"),
     }
     wout = WEB / "weights.json"
