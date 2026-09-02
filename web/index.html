@@ -823,6 +823,146 @@ function stackSVG(iso) {
     + `</p>`;
 }
 
+/* Source -> channel -> economy, as a Sankey.
+   The reverse map answers "which countries" and the bar list ranks them. Neither
+   answers "through what", and that is the question the channel mix actually
+   poses: Russia reaches Germany through energy, China through raw materials,
+   and the same dependency share means something different depending on which.
+   A middle column is the whole reason this is a Sankey rather than a bar chart
+   with curves on it.
+
+   It also makes the residual structural rather than stated. The chokepoint band
+   arrives in the channel column with nothing feeding it from the left, because
+   there is nothing to feed it: the weight attaches to a strait. One scale is
+   used for both columns, so the source column ends short of the channel column
+   by exactly the unattributable share, and the gap is visible without reading a
+   number. */
+const SANKEY_TOP_SOURCES = 6;
+
+function sankeySVG(iso) {
+  const a = currentAttribution();
+  if (!a || a.total == null || !(a.total > 0)) return '';
+
+  const chanCol = { trade: '#184f95', va: '#184f95', energy: '#256abf', crm: '#3987e5', choke: '#6da7ec' };
+  const chanLbl = { trade: 'Trade', va: 'Trade (VA)', energy: 'Energy', crm: 'Raw mat.', choke: 'Chokepoint' };
+  // Chokepoint last, so the band with no source sits at the bottom of the
+  // column where the shortfall against the source column reads as one gap.
+  const order = [state.basis, 'energy', 'crm', 'choke'];
+
+  const chanTotal = {};
+  for (const r of a.rows) for (const ch of order) if (r.ch[ch]) chanTotal[ch] = (chanTotal[ch] || 0) + r.ch[ch];
+  if (a.residual > 0) chanTotal.choke = a.residual;
+  const chans = order.filter(ch => (chanTotal[ch] || 0) > 0);
+  if (!chans.length) return '';
+
+  // Top N by contribution, remainder aggregated. 43 ribbons into four nodes is
+  // a hairball; the bar list above already carries the full ranking and the
+  // download carries all of it.
+  const top = a.rows.slice(0, SANKEY_TOP_SOURCES).filter(r => r.total > 0);
+  const restRows = a.rows.slice(SANKEY_TOP_SOURCES).filter(r => r.total > 0);
+  const nodes = top.map(r => ({ key: r.iso, label: NAMES[r.iso] || r.iso, value: r.total, ch: r.ch, share: r.share }));
+  if (restRows.length) {
+    const ch = {}, tot = restRows.reduce((t, r) => t + r.total, 0);
+    for (const r of restRows) for (const k of order) if (r.ch[k]) ch[k] = (ch[k] || 0) + r.ch[k];
+    nodes.push({ key: '_other', label: restRows.length + ' others', value: tot, ch: ch,
+                 share: tot / a.total, other: true });
+  }
+
+  const W = 268, H = 224, TOP = 13, BOT = 5, GAP = 3;
+  const HH = H - TOP - BOT;
+  const SX = 64, SW = 6, CX = 152, CW = 22, TX = 250, TW = 8;
+  // One scale for both columns: the channel column carries the whole Intensity,
+  // the source column only the attributable part, and the difference is the
+  // point of the picture.
+  const scale = (HH - Math.max(0, chans.length - 1) * GAP) / a.total;
+  const hOf = v => Math.max(v > 0 ? 0.8 : 0, v * scale);
+
+  const sy = {}, cy = {}, cyIn = {}, syOut = {};
+  let y = TOP;
+  for (const n of nodes) { sy[n.key] = { y0: y, h: hOf(n.value) }; syOut[n.key] = y; y += hOf(n.value) + GAP; }
+  const srcBottom = y - GAP;
+  y = TOP;
+  for (const ch of chans) { cy[ch] = { y0: y, h: hOf(chanTotal[ch]) }; cyIn[ch] = y; y += hOf(chanTotal[ch]) + GAP; }
+
+  const ribbon = (x0, y0, x1, y1, h0, h1, fill, op) => {
+    const cx = (x0 + x1) / 2;
+    return `<path d="M${x0} ${y0.toFixed(2)} C${cx} ${y0.toFixed(2)} ${cx} ${y1.toFixed(2)} ${x1} ${y1.toFixed(2)}`
+         + ` L${x1} ${(y1 + h1).toFixed(2)} C${cx} ${(y1 + h1).toFixed(2)} ${cx} ${(y0 + h0).toFixed(2)} ${x0} ${(y0 + h0).toFixed(2)} Z"`
+         + ` fill="${fill}" opacity="${op}"/>`;
+  };
+
+  let flows = '';
+  for (const n of nodes) for (const ch of chans) {
+    const v = n.ch[ch];
+    if (!v) continue;
+    const h = hOf(v);
+    flows += ribbon(SX + SW, syOut[n.key], CX, cyIn[ch], h, h, chanCol[ch], n.other ? '.32' : '.55');
+    syOut[n.key] += h; cyIn[ch] += h;
+  }
+  // Channel -> economy. Drawn after the source ribbons so the second bundle
+  // reads as one flow converging rather than as more of the same fan.
+  let outY = TOP, conv = '';
+  for (const ch of chans) {
+    const h = hOf(chanTotal[ch]);
+    conv += ribbon(CX + CW, cy[ch].y0, TX, outY, h, h, chanCol[ch], '.45');
+    outY += h;
+  }
+
+  const trunc = (t, k) => t.length > k ? t.slice(0, k - 1) + '…' : t;
+  let bars = '', labels = '';
+  for (const n of nodes) {
+    const b = sy[n.key];
+    bars += `<rect x="${SX}" y="${b.y0.toFixed(2)}" width="${SW}" height="${b.h.toFixed(2)}" rx="1" fill="${
+      n.other ? 'var(--muted)' : colourFor(bucket(n.share, null))}"/>`;
+    labels += `<text x="${SX - 4}" y="${(b.y0 + b.h / 2 + 2.4).toFixed(2)}" font-size="7" fill="var(--muted)" text-anchor="end">${
+      xesc(trunc(n.label, 16))}</text>`;
+  }
+  for (const ch of chans) {
+    const b = cy[ch];
+    bars += `<rect x="${CX}" y="${b.y0.toFixed(2)}" width="${CW}" height="${b.h.toFixed(2)}" rx="1" fill="${chanCol[ch]}"/>`;
+    // Inline only where the band is tall enough to hold it; the key below is
+    // what the reader is actually meant to rely on.
+    if (b.h >= 9) labels += `<text x="${CX + CW / 2}" y="${(b.y0 + b.h / 2 + 2.2).toFixed(2)}" font-size="6.2" fill="#e6edf3" text-anchor="middle">${
+      xesc(trunc(chanLbl[ch], 10))}</text>`;
+  }
+  bars += `<rect x="${TX}" y="${TOP}" width="${TW}" height="${(a.total * scale).toFixed(2)}" rx="1" fill="var(--ink)" opacity=".75"/>`;
+
+  // The chokepoint band has no left-hand ribbon. Say so where it happens rather
+  // than only in the caption, or it reads as a rendering fault.
+  let stub = '';
+  if (chanTotal.choke > 0) {
+    const b = cy.choke;
+    stub += `<line x1="${SX + SW}" y1="${(b.y0 + b.h / 2).toFixed(2)}" x2="${CX}" y2="${(b.y0 + b.h / 2).toFixed(2)}" stroke="var(--warn)" stroke-width="0.7" stroke-dasharray="2 2" opacity=".8"/>`
+       + `<text x="${((SX + SW + CX) / 2).toFixed(1)}" y="${(b.y0 + b.h / 2 - 3).toFixed(2)}" font-size="6" fill="var(--warn)" text-anchor="middle">no source country</text>`;
+  }
+
+  const hdr = `<text x="${SX + SW}" y="7" font-size="6.2" fill="var(--muted)" text-anchor="end">SOURCE</text>`
+    + `<text x="${CX}" y="7" font-size="6.2" fill="var(--muted)">CHANNEL</text>`
+    + `<text x="${TX + TW / 2}" y="7" font-size="6.2" fill="var(--muted)" text-anchor="middle">${xesc(iso)}</text>`;
+
+  const chanPct = chans.map(ch => chanLbl[ch] + ' ' + Math.round(chanTotal[ch] / a.total * 100) + '%').join(', ');
+  const topPct = nodes.filter(n => !n.other).slice(0, 3)
+    .map(n => n.label + ' ' + (n.share * 100).toFixed(1) + '%').join(', ');
+  const alt = `Sources of ${NAMES[iso] || iso}'s Intensity at ${state.months[state.idx]}, routed through channels. `
+    + `By channel: ${chanPct}. Largest sources: ${topPct}. `
+    + (a.residual > 0
+        ? `The chokepoint band, ${(a.residualShare * 100).toFixed(1)} per cent, enters with no source country and is left unattributed.`
+        : `The chokepoint slider is at zero, so every band has a source.`);
+
+  const key = chans.map(ch => `<span><i style="background:${chanCol[ch]}"></i>${chanLbl[ch]} ${
+    Math.round(chanTotal[ch] / a.total * 100)}%</span>`).join('');
+
+  return `<svg class="sankey" viewBox="0 0 ${W} ${H}" role="img" aria-label="${xesc(alt)}">${flows}${conv}${stub}${bars}${labels}${hdr}</svg>`
+    + `<div class="stack-key sankey-key">${key}</div>`
+    + `<p class="cap sankey-cap">Band width is share of ${xesc(NAMES[iso] || iso)}’s Intensity at ${state.months[state.idx]}. `
+    + `Source bars are coloured by the same breaks as the map. `
+    + (restRows.length ? `The ${restRows.length} smallest sources are pooled; the list above ranks all ${a.rows.length}. ` : '')
+    + (a.residual > 0
+        ? `The chokepoint band has no inflow because its weight attaches to a strait, not a country — the source column ends ${(a.residualShare * 100).toFixed(1)}% short of the channel column for that reason.`
+        : `Chokepoint is at zero, so the two columns are the same height.`)
+    + `</p>`;
+}
+
 /* Reverse-view panel. Deliberately not a variant of the exposure panel: it
    answers a different question, in different units, and the number that must
    not be lost - the unattributable chokepoint share - has no counterpart there.
@@ -845,6 +985,7 @@ function detailSources(iso) {
   const shown = a.rows.slice(0, 15);
   const rest = a.rows.length - shown.length;
   const restSum = a.rows.slice(shown.length).reduce((t, r) => t + r.share, 0);
+  const sankeyHTML = sankeySVG(iso);
   const bar = r => `<div class="srcrow"><span class="nm" title="${xesc(NAMES[r.iso] || r.iso)}">${NAMES[r.iso] || r.iso}</span>`
     + `<span class="bar"><i style="width:${Math.max(1, Math.min(100, r.share / (a.rows[0].share || 1) * 100)).toFixed(1)}%;background:${colourFor(bucket(r.share, null))}"></i></span>`
     + `<span class="pc">${(r.share * 100).toFixed(1)}%</span></div>`;
@@ -854,6 +995,8 @@ function detailSources(iso) {
     <div class="metric"><span><b>Intensity</b></span><b>${a.total == null ? '—' : num(a.total)}</b></div>
     <div class="metric"><span>Attributed to source countries</span><b>${(a.attributedShare * 100).toFixed(1)}%</b></div>
     <div class="metric"><span style="color:var(--warn)">Chokepoint, unattributable</span><b style="color:var(--warn)">${(a.residualShare * 100).toFixed(1)}%</b></div>
+    ${sankeyHTML ? `<h2 style="margin-top:14px">Routing</h2>` + sankeyHTML
+        + `<div class="chartdl-row"><button class="chartdl" type="button" data-chart="sankey">Download SVG</button></div>` : ''}
     <h2 style="margin-top:14px">Source countries</h2>
     ${shown.map(bar).join('')}
     ${rest > 0 ? `<p class="cap">+ ${rest} smaller sources, ${(restSum * 100).toFixed(1)}% between them. The risk-sources download carries all ${a.rows.length}.</p>` : ''}
@@ -1278,13 +1421,18 @@ function chartFigure(which) {
     '<text x="' + x + '" y="' + y.toFixed(1) + '" font-size="' + size + '" fill="' + fill + '"'
     + (extra || '') + '>' + xesc(str) + '</text>';
 
-  const heading = which === 'spark' ? 'Intensity' : 'Channel composition';
+  const heading = which === 'spark' ? 'Intensity'
+                : which === 'sankey' ? 'Source routing' : 'Channel composition';
   const last = state.months[state.months.length - 1];
   let y = PAD + 9, body = '';
   body += t(PAD, y, (NAMES[iso] || iso) + ' — ' + heading, 11, V('ink'), ' font-weight="600"');
   y += 10.5;
-  body += t(PAD, y, iso + ' · ' + state.months[0] + ' to ' + last + ' · ' + state.mode
-    + ' · marker at ' + state.months[state.idx], 7, V('muted'));
+  // The Sankey is one month, not a series; saying "1985-01 to 2026-08" over a
+  // snapshot would misdate every band in it.
+  body += t(PAD, y, which === 'sankey'
+    ? iso + ' · ' + state.months[state.idx] + ' · ' + state.mode + ' · channel mix as set'
+    : iso + ' · ' + state.months[0] + ' to ' + last + ' · ' + state.mode
+      + ' · marker at ' + state.months[state.idx], 7, V('muted'));
   y += 10;
 
   const chartY = y;
@@ -1310,9 +1458,15 @@ function chartFigure(which) {
     y += rows * 10 + 12;
   }
 
-  const panelCap = which === 'stack'
-    ? (document.querySelector('#detail .cap') || {}).textContent : '';
+  const panelCap = which === 'stack' ? (document.querySelector('#detail .cap') || {}).textContent
+                 : which === 'sankey' ? (document.querySelector('#detail .sankey-cap') || {}).textContent
+                 : '';
   const caps = [panelCap,
+    which === 'sankey' && typeof currentAttribution === 'function' && currentAttribution()
+      ? 'Chokepoint transit weights a strait, not a country, so '
+        + (currentAttribution().residualShare * 100).toFixed(1)
+        + '% of this Intensity has no source-country attribution and enters the channel column with no inflow.'
+      : '',
     state.mode === 'rebased'
       ? 'Rebased: each source country indexed to its own 1985-2023 mean = 100.'
       : 'Level: channel-weighted GPR in raw units.',
@@ -1338,7 +1492,8 @@ function chartFigure(which) {
     + '<rect width="' + W + '" height="' + H + '" fill="' + V('panel') + '"/>'
     + '<g transform="translate(' + PAD + ' ' + chartY.toFixed(1) + ')">' + inner + '</g>'
     + body + '</svg>\n';
-  return { svg, name: 'ribat_' + iso + '_' + (which === 'spark' ? 'intensity' : 'composition')
+  return { svg, name: 'ribat_' + iso + '_'
+    + (which === 'spark' ? 'intensity' : which === 'sankey' ? 'routing' : 'composition')
     + '_' + state.months[state.idx] + '.svg' };
 }
 
