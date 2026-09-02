@@ -270,6 +270,47 @@ def main() -> None:
     print(f"wrote {out}  ({len(countries)} economies x {len(months)} months x "
           f"{len(channels)} channels, {kb} KB)")
 
+    # ---- bilateral weight payload (reverse map) ----------------------------
+    # To attribute a country's Intensity back to the sources producing it, the
+    # interface needs w^c_ij itself. Shipping weights rather than precomputed
+    # contributions keeps the channel mix client-side, exactly as the main
+    # payload does:
+    #     contribution of j to i at t = sum_c theta_c w^c_ij G_j,t / sum_c theta_c
+    # which sums over j to Intensity_i,t. Loaded lazily by the front end, so the
+    # initial page weight is unchanged.
+    #
+    # The chokepoint channel is absent by construction: its weight attaches to a
+    # strait, not to a source country, so it cannot be attributed here and the
+    # interface must disclose the share it leaves unexplained.
+    src_list = sorted(w_all["source_iso3"].unique())
+    src_idx = {s: i for i, s in enumerate(src_list)}
+    wmap: dict[str, dict] = {}
+    blocks = 0
+    for (exp, ch, yr), grp in w_all.groupby(["exposed_iso3", "channel", "year"]):
+        pairs = [[src_idx[r.source_iso3], round(float(r.w), 6)]
+                 for r in grp.itertuples() if pd.notna(r.w) and r.w > 0]
+        if not pairs:
+            continue
+        wmap.setdefault(exp, {}).setdefault(ch, {})[str(int(yr))] = pairs
+        blocks += 1
+    wpay = {
+        "kind": "bilateral_weights",
+        "channels": sorted(w_all["channel"].unique()),
+        "years": [int(y) for y in years],
+        "sources": src_list,
+        "w": wmap,
+        "note": "w[exposed][channel][weight_year] = [[source index, weight], ...]; "
+                "source index refers to the 'sources' array. Contribution of source j "
+                "to exposed country i at month t = sum_c theta_c * w^c_ij * G_j,t / "
+                "sum_c theta_c, summing over j to Intensity_i,t. The chokepoint channel "
+                "is not present: its weight attaches to a strait, not a source country.",
+        "generated": pd.Timestamp.today().strftime("%Y-%m-%d"),
+    }
+    wout = WEB / "weights.json"
+    wout.write_text(json.dumps(wpay, separators=(",", ":")))
+    print(f"wrote {wout}  ({len(wmap)} exposed x {len(src_list)} sources, "
+          f"{blocks} vintage blocks, {wout.stat().st_size // 1024} KB)")
+
     show = intens[(intens["month"] == last)]
     for ch in channels:
         top5 = show[show["channel"] == ch].nlargest(5, "rebased")
