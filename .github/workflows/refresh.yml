@@ -83,8 +83,12 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # README.md carries the generated provenance block, which 01 rewrites
+          # from the payload it just built. Leaving it out would publish a new
+          # vintage under the previous vintage's digest, and the verifier would
+          # fail on the next run against a README nobody had touched.
           git add -f web/data/gpr.json web/data/intensity.json \
-                     data/processed/validation_report.txt
+                     data/processed/validation_report.txt README.md
           MONTH=$(python3 -c "import json;print(json.load(open('web/data/gpr.json'))['months'][-1])")
           git commit -m "Data refresh: GPR through ${MONTH}
 

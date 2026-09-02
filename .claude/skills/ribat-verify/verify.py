@@ -2,6 +2,7 @@
 """Ribat pre-commit verification. Deterministic; no network. Exit 0 = pass."""
 from __future__ import annotations
 
+import hashlib
 import json
 import py_compile
 import re
@@ -293,6 +294,30 @@ def main() -> int:
     check("a.total" in sk and "scale" in sk,
           "both columns share one scale, so the shortfall is to scale")
 
+    # Provenance rots when it is typed by hand, and this repository has already
+    # shipped a payload note that was wrong about its own contents. The README
+    # block is generated; this fails if it has drifted from the payload it
+    # claims to describe, which is the only thing that makes it worth trusting.
+    section("provenance")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    gpr_p = ROOT / "web" / "data" / "gpr.json"
+    have_block = "<!-- PROVENANCE:START -->" in readme and "<!-- PROVENANCE:END -->" in readme
+    check(have_block, "README carries a generated provenance block")
+    if have_block and gpr_p.exists():
+        g = json.loads(gpr_p.read_text(encoding="utf-8"))
+        blk = readme.split("<!-- PROVENANCE:START -->")[1].split("<!-- PROVENANCE:END -->")[0]
+        digest = hashlib.sha256(json.dumps(
+            {"m": g["months"], "c": g["countries"]}, sort_keys=True).encode()).hexdigest()
+        check(digest in blk,
+              "README series digest matches web/data/gpr.json")
+        check(g["months"][-1] in blk,
+              f"README states the published data month ({g['months'][-1]})")
+        wb = g.get("workbook_sha256")
+        check(wb in blk if wb else "not recorded" in blk,
+              "README states the workbook digest, or says it is not recorded")
+        check("do not edit by hand" in blk,
+              "block says it is generated, so nobody hand-edits it into a lie")
+
     section("pipeline guards")
     p3 = (ROOT / "pipeline" / "03_build_intensity.py")
     src3 = p3.read_text(encoding="utf-8") if p3.exists() else ""
@@ -302,6 +327,16 @@ def main() -> int:
           "03 offers an explicit override for intended shrinkage")
     check("sys.exit(1)" in src3,
           "03 exits non-zero when it refuses, so CI cannot ignore it")
+    # 01 publishes web/data/gpr.json, which the site reads directly, so a stale
+    # workbook in data/raw can cost it a month exactly as it could for 03.
+    p1 = (ROOT / "pipeline" / "01_load_gpr.py")
+    src1 = p1.read_text(encoding="utf-8") if p1.exists() else ""
+    check("REFUSING to overwrite" in src1 and "sys.exit(1)" in src1,
+          "01 refuses to publish a shorter gpr.json than the one on disk")
+    check("--allow-regression" in src1,
+          "01 offers an explicit override for intended shrinkage")
+    check("--stamp-only" in src1,
+          "01 can restamp provenance without a workbook, which clones lack")
 
     section("export contract (map)")
     # The v4 spelling passes this file's eye but not MapLibre's: v5 ignores a

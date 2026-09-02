@@ -15,6 +15,8 @@ Data are CC-BY. Citation is mandatory — see METHODOLOGY.md section 6.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import sys
 from datetime import date
@@ -75,7 +77,6 @@ def export_web(tidy: pd.DataFrame) -> None:
     such. Once 03_build_intensity.py exists it writes web/data/intensity.json, which the
     front end prefers over this file.
     """
-    import json
 
     recent = tidy[(tidy["variant"] == "recent") & (tidy["month"].dt.year >= 1985)]
     months = sorted(recent["month"].unique())
@@ -92,21 +93,165 @@ def export_web(tidy: pd.DataFrame) -> None:
             reb[i] = None if pd.isna(r) else round(float(r), 2)
         countries[iso] = {"level": lvl, "rebased": reb}
 
+    st = RAW.stat()
     payload = {
         "kind": "gpr_source_side",
         "months": month_labels,
         "countries": countries,
         "source": "Caldara & Iacoviello (2022), country-specific GPR, CC-BY",
-        "downloaded": date.today().isoformat(),
+        # The workbook is republished IN PLACE with prior months revised, so a
+        # date does not identify a vintage: two people can fetch "the GPR
+        # workbook" weeks apart, get different numbers, and have no way to tell
+        # which one produced a given chart. The digest identifies it.
+        "workbook_sha256": file_sha256(RAW),
+        "workbook_bytes": st.st_size,
+        # When the workbook was fetched, not when this script last ran. This was
+        # date.today(), which made every rebuild look like a fresh download and
+        # told a reader nothing about the vintage they were looking at.
+        "downloaded": date.fromtimestamp(st.st_mtime).isoformat(),
+        "built": date.today().isoformat(),
     }
+    payload["content_sha256"] = series_sha256(month_labels, countries)
     web_dir = ROOT / "web" / "data"
     web_dir.mkdir(parents=True, exist_ok=True)
     out = web_dir / "gpr.json"
+
+    # data/raw is gitignored and the refresh runs in CI, so a working tree can
+    # hold a workbook older than the published payload. Rebuilding from it
+    # silently dropped a month here - the run printed a clean "wrote ... 499
+    # months" and nothing said the file had just lost data. 03 has had this
+    # guard since the payload it writes is the one the site reads; 01 writes a
+    # published payload too and needs it for the same reason.
+    if out.exists() and "--allow-regression" not in sys.argv:
+        try:
+            prev = json.loads(out.read_text())
+        except (json.JSONDecodeError, OSError):
+            prev = None
+        if prev and prev.get("months"):
+            pm, nm = prev["months"], month_labels
+            lost = set(prev.get("countries") or {}) - set(countries)
+            if nm[-1] < pm[-1] or len(nm) < len(pm) or lost:
+                print(f"REFUSING to overwrite {out.name}: "
+                      f"{len(pm)} months through {pm[-1]} on disk, "
+                      f"{len(nm)} through {nm[-1]} from this workbook"
+                      + (f", losing {sorted(lost)}" if lost else ""))
+                print("  The workbook in data/raw is almost certainly older than the "
+                      "published payload. Re-download it, or pass --allow-regression "
+                      "if upstream genuinely withdrew data.")
+                sys.exit(1)
+
     out.write_text(json.dumps(payload, separators=(",", ":")))
     print(f"wrote {out}  ({len(countries)} countries x {len(months)} months)")
+    print(f"  workbook {payload['workbook_sha256'][:16]}…  fetched {payload['downloaded']}")
+    print(f"  series   {payload['content_sha256'][:16]}…  through {month_labels[-1]}")
+    stamp_readme(payload)
+
+
+def file_sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for blk in iter(lambda: f.read(1 << 20), b""):
+            h.update(blk)
+    return h.hexdigest()
+
+
+def series_sha256(months: list[str], countries: dict) -> str:
+    """Digest of the data, not the file.
+
+    Deliberately the SAME recipe as the change detection in
+    .github/workflows/refresh.yml. If the two ever diverge, the workflow's
+    "is this a new vintage" answer and the README's published stamp stop
+    describing the same object, and nobody would notice; the verifier compares
+    the README against this value for that reason.
+    """
+    return hashlib.sha256(
+        json.dumps({"m": months, "c": countries}, sort_keys=True).encode()
+    ).hexdigest()
+
+
+README_START = "<!-- PROVENANCE:START -->"
+README_END = "<!-- PROVENANCE:END -->"
+
+
+def stamp_readme(payload: dict) -> None:
+    """Rewrite the provenance block in README.md from the published payload.
+
+    Hand-maintained provenance rots. This repository has already shipped one
+    payload note that was wrong about its own contents, so the block is
+    generated rather than typed, and the verifier fails if it drifts from
+    web/data/gpr.json.
+    """
+    readme = ROOT / "README.md"
+    if not readme.exists():
+        return
+    txt = readme.read_text(encoding="utf-8")
+    if README_START not in txt or README_END not in txt:
+        print(f"NOTE {readme.name} has no provenance markers — not stamped")
+        return
+    # Describe the payload that is published, not a workbook that happens to be
+    # in data/raw. A clone has no workbook at all (it is gitignored), and a
+    # maintainer's local copy can be a month behind what CI published - stamping
+    # from the file on disk would put a digest in the README for a vintage the
+    # site is not serving.
+    wb_sha = payload.get("workbook_sha256")
+    wb_row = (f"| Workbook SHA-256 | `{wb_sha}` |" if wb_sha else
+              "| Workbook SHA-256 | not recorded — this payload predates the field; "
+              "the next refresh stamps it |")
+    size_row = (f"| GPR workbook | `{RAW.name}`, {payload['workbook_bytes']:,} bytes |"
+                if payload.get("workbook_bytes") else f"| GPR workbook | `{RAW.name}` |")
+    block = "\n".join([
+        README_START,
+        "",
+        "| | |",
+        "|---|---|",
+        size_row,
+        wb_row,
+        f"| Fetched | {payload.get('downloaded', 'unknown')} |",
+        f"| Data through | {payload['months'][-1]} |",
+        f"| Series SHA-256 | `{payload.get('content_sha256') or series_sha256(payload['months'], payload['countries'])}` |",
+        f"| Payload built | {payload.get('built', payload.get('downloaded', 'unknown'))} |",
+        "",
+        "Generated by `pipeline/01_load_gpr.py`; do not edit by hand. The verifier",
+        "fails if this block disagrees with `web/data/gpr.json`.",
+        "",
+        "The workbook is republished **in place** with recent months revised, so the",
+        "filename and the fetch date do not identify a vintage on their own — only the",
+        "digests do. To check that a clone holds the same data these numbers were built",
+        "from:",
+        "",
+        "```bash",
+        "shasum -a 256 data/raw/data_gpr_export.xls        # must match Workbook SHA-256",
+        "python3 -c \"import hashlib,json;d=json.load(open('web/data/gpr.json'));print(hashlib.sha256(json.dumps({'m':d['months'],'c':d['countries']},sort_keys=True).encode()).hexdigest())\"",
+        "```",
+        "",
+        "The second command recomputes Series SHA-256 from the published payload, so it",
+        "works without the workbook — which `.gitignore` excludes.",
+        "",
+        README_END,
+    ])
+    start = txt.index(README_START)
+    end = txt.index(README_END) + len(README_END)
+    readme.write_text(txt[:start] + block + txt[end:], encoding="utf-8")
+    print(f"stamped {readme.name} provenance block")
+
+
+def stamp_only() -> int:
+    """Refresh the README block from the published payload without rebuilding.
+
+    Needed because the workbook is gitignored: a clone, or a maintainer whose
+    local copy is stale, must still be able to regenerate a truthful stamp.
+    """
+    src = ROOT / "web" / "data" / "gpr.json"
+    if not src.exists():
+        print(f"no {src} — nothing to stamp")
+        return 1
+    stamp_readme(json.loads(src.read_text()))
+    return 0
 
 
 def main() -> None:
+    if "--stamp-only" in sys.argv:
+        sys.exit(stamp_only())
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     df = load_workbook(RAW)
 
