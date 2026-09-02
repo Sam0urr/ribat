@@ -290,9 +290,40 @@ def main() -> int:
           "caption explains the column shortfall as the unattributable share")
     check('data-chart="sankey"' in html and "'routing'" in html,
           "Sankey exports as its own figure")
-    sk = html.split("function sankeySVG(")[-1].split("\nfunction ")[0]
+    # The arithmetic lives in sankeyRender since the panel and the expanded view
+    # were split into two frames over one model. Both frames must still share one
+    # scale AND one gap budget: unequal gap spending between the columns fakes the
+    # shortfall just as effectively as an unequal scale, and at 43 source nodes it
+    # would have swallowed the residual entirely.
+    check("function sankeyModel(" in html and "function sankeyRender(" in html,
+          "Sankey model and render are separable, so both frames share one arithmetic")
+    sk = html.split("function sankeyRender(")[-1].split("\nfunction ")[0]
     check("a.total" in sk and "scale" in sk,
           "both columns share one scale, so the shortfall is to scale")
+    check("budget" in sk and "srcGap" in sk,
+          "both columns share one gap budget, so the shortfall is not gap artefact")
+
+    # Expanded view. The un-pooled frame is the only place a reader can inspect
+    # the pooled tail, and it must carry the same disclosures as the panel.
+    check('id="sankeyModal"' in html and 'aria-modal="true"' in html,
+          "expanded routing view is a real dialog")
+    check("function closeSankeyModal(" in html and "'Escape'" in html,
+          "expanded view closes on Escape")
+    check("SANKEY_GEOM" in html and "pool: 0" in html,
+          "expanded view un-pools: every source country is drawn individually")
+    check("skReturnFocus" in html, "expanded view restores focus on close")
+    check("short of the channel column: chokepoint transit weights a strait" in html,
+          "expanded view brackets and numbers the chokepoint shortfall, not just the panel")
+    check('data-root="modal"' in html and "chartFigure(which, where)" in html,
+          "SVG download works from the expanded view as well as the panel")
+    check("sankeyBandText" in html and "aria-label" in html,
+          "bands carry the tooltip text as an aria-label, so hover and screen reader agree")
+    check("sankeyTipHTML" in html and "getAttribute('aria-label')" in html,
+          "the tooltip renders the aria-label itself rather than a parallel string")
+    check('tabindex="0"' in html and "sk-band" in html,
+          "bands and nodes are focusable")
+    check("sk-hl" in html and "opacity" in html and "sk-lit" in html,
+          "dim/lit state is opacity only, no second palette (invariant 5)")
 
     # Provenance rots when it is typed by hand, and this repository has already
     # shipped a payload note that was wrong about its own contents. The README

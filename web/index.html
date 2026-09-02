@@ -99,6 +99,91 @@
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
     clip:rect(0 0 0 0);white-space:nowrap;border:0}
   .cap{font-size:10px;color:var(--muted);margin-top:8px;max-width:100%;line-height:1.45}
+
+  /* Sankey interaction. Dim/lit is opacity only - no new hues, no second
+     palette (invariant 5): the ramp keeps meaning what it means and the
+     highlight is a change in emphasis, not in category. */
+  .sankey{width:100%;height:auto;display:block;margin:2px 0 3px}
+  .sankey-wrap{position:relative;cursor:zoom-in;border-radius:4px}
+  .sankey-wrap:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .sankey-expand{position:absolute;top:2px;right:2px;font-size:8.5px;color:var(--muted);
+    background:rgba(13,17,23,.75);border:1px solid var(--line);border-radius:4px;
+    padding:1px 4px;pointer-events:none;letter-spacing:.03em}
+  .sankey-wrap:hover .sankey-expand{color:var(--accent);border-color:var(--accent)}
+  svg.sankey .sk-band,svg.sankey .sk-conv,svg.sankey .sk-bar,svg.sankey .sk-lead,svg.sankey text{
+    transition:opacity .12s linear}
+  @media (prefers-reduced-motion:reduce){
+    svg.sankey .sk-band,svg.sankey .sk-conv,svg.sankey .sk-bar,svg.sankey .sk-lead,svg.sankey text{transition:none}}
+  svg.sk-live .sk-band,svg.sk-live .sk-node{cursor:pointer}
+  svg.sk-live.sk-hl .sk-band{opacity:.07!important}
+  svg.sk-live.sk-hl .sk-conv{opacity:.06!important}
+  /* The chokepoint disclosure is not decoration: dimming it with everything else
+     hid the one thing this chart is required to keep saying. */
+  svg.sk-live.sk-hl .sk-note{opacity:1!important}
+  svg.sk-live.sk-hl .sk-bar{opacity:.14}
+  svg.sk-live.sk-hl text{opacity:.22}
+  svg.sk-live.sk-hl .sk-lead{opacity:.12}
+  svg.sk-live.sk-hl .sk-band.sk-lit{opacity:.9!important}
+  /* Deliberately fainter than a lit band: this ribbon is the whole channel, not
+     the highlighted source's slice of it, and lighting it fully overstated the
+     flow being traced. */
+  svg.sk-live.sk-hl .sk-conv.sk-lit{opacity:.3!important}
+  svg.sk-live.sk-hl .sk-node.sk-lit .sk-bar{opacity:1}
+  svg.sk-live.sk-hl .sk-node.sk-lit text{opacity:1;fill:var(--ink)}
+  svg.sk-live.sk-hl .sk-node.sk-lit .sk-lead{opacity:.8}
+  svg.sk-live .sk-band:focus-visible,svg.sk-live .sk-node:focus-visible{
+    outline:2px solid var(--accent);outline-offset:1px}
+  svg.sk-live .sk-node:focus-visible .sk-bar{stroke:var(--ink);stroke-width:1}
+
+  #sankeyTip{position:fixed;z-index:60;max-width:330px;pointer-events:none;
+    background:rgba(13,17,23,.97);border:1px solid var(--line);border-radius:6px;
+    padding:7px 9px;font-size:11px;line-height:1.45;color:var(--ink);
+    box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  #sankeyTip b{font-family:var(--mono);font-weight:600}
+  #sankeyTip .tw{color:var(--warn)}
+  #sankeyTip .tm{color:var(--muted);font-size:10px;display:block;margin-top:3px}
+
+  /* Expanded view. A dialog rather than a route: the month, mix and basis behind
+     it stay live, and closing must put the reader back exactly where they were. */
+  #sankeyModal{position:fixed;inset:0;z-index:50;background:rgba(6,9,13,.82);
+    backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:20px}
+  #sankeyModal[hidden]{display:none}
+  .modal-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    width:min(1180px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
+  .modal-head{display:flex;align-items:flex-start;gap:12px;padding:14px 16px 10px;
+    border-bottom:1px solid var(--line);flex:0 0 auto}
+  .modal-head h2{margin:0;font-size:13px;text-transform:none;letter-spacing:0;color:var(--ink)}
+  .modal-head .iso{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px}
+  .modal-close{margin-left:auto;background:none;border:1px solid var(--line);border-radius:6px;
+    color:var(--muted);font:inherit;font-size:11px;padding:5px 10px;cursor:pointer;flex:0 0 auto}
+  .modal-close:hover{border-color:var(--accent);color:var(--accent)}
+  .modal-body{flex:1 1 auto;min-height:0;overflow:auto;padding:12px 16px;
+    display:flex;align-items:flex-start}
+  /* Fit the diagram to the dialog rather than letting it overflow. It used to
+     run past the bottom of the scroll area, which put the chokepoint shortfall
+     bracket - the one annotation that must not be missable - below the fold. */
+  #skBody svg.sankey{max-height:calc(100vh - 250px);max-width:100%;margin:auto}
+  .modal-foot{flex:0 0 auto;border-top:1px solid var(--line);padding:10px 16px 14px}
+  .modal-foot .cap{margin-top:5px}
+  .skiplink{position:absolute;left:-9999px;top:0;background:var(--accent);color:#06101f;
+    padding:6px 10px;border-radius:0 0 6px 0;font-size:11px;z-index:61;text-decoration:none}
+  .skiplink:focus{left:0}
+  #detail .skiplink{position:static;display:none;width:100%;text-align:center;
+    border-radius:5px;margin-bottom:4px}
+  #detail .skiplink:focus{display:block;left:auto}
+  .lockrow{display:flex;align-items:center;gap:10px;font-size:10.5px;color:var(--muted);
+    margin-top:6px;flex-wrap:wrap}
+  .lockrow button{background:none;border:1px solid var(--line);border-radius:5px;
+    color:var(--muted);font:inherit;font-size:10px;padding:2px 7px;cursor:pointer}
+  .lockrow button:hover{border-color:var(--accent);color:var(--accent)}
+  @media (max-width:900px){
+    #sankeyModal{padding:0}
+    .modal-card{border-radius:0;width:100%}
+    /* Shrinking 43 labelled sources to fit a phone renders them at about 4px.
+       Better to keep the diagram legible and let the reader pan it, which is
+       also the only way the leader lines stay attached to anything. */
+    #skBody svg.sankey{max-width:none;min-width:860px;max-height:none;margin:0}
+  }
 </style>
 </head>
 <body>
@@ -110,6 +195,31 @@
      hostile screen-reader experience. -->
 <div class="sr-only" id="liveRegion" role="status" aria-live="polite" aria-atomic="true"></div>
 <div class="sr-only" id="srTable"></div>
+
+<!-- Expanded routing view. Built empty and filled on open, so the un-pooled
+     43-source diagram is never in the DOM while nobody is looking at it. -->
+<div id="sankeyModal" hidden role="dialog" aria-modal="true" aria-labelledby="skTitle" aria-describedby="skSub">
+  <div class="modal-card" id="skCard">
+    <a class="skiplink" href="#skFoot" id="skSkip">Skip past the diagram</a>
+    <div class="modal-head">
+      <div>
+        <h2 id="skTitle">Source routing</h2>
+        <div class="iso" id="skSub"></div>
+      </div>
+      <button type="button" class="modal-close" id="skClose" aria-label="Close the expanded routing view">Close ✕</button>
+    </div>
+    <div class="modal-body" id="skBody"></div>
+    <div class="modal-foot" id="skFoot" tabindex="-1">
+      <div class="stack-key" id="skKey"></div>
+      <div class="lockrow">
+        <span id="skLock">Hover or focus a band to trace it. Tap to lock on a touch screen.</span>
+        <button type="button" id="skClear" hidden>Clear highlight</button>
+        <button type="button" class="chartdl" data-chart="sankey" data-root="modal">Download SVG</button>
+      </div>
+      <p class="cap" id="skCap"></p>
+    </div>
+  </div>
+</div>
 
 <div id="left">
 <div class="panel" id="controls">
@@ -635,6 +745,12 @@ function updateSrTable(rows, attr) {
 function render() {
   syncExportUI();
   updateViewNote();
+  // The month slider, mix and basis stay live behind the dialog. Rebuilding it
+  // here is what keeps an open expanded view from showing a month the rest of
+  // the page has already moved on from.
+  if (typeof sankeyModalOpen === 'function' && sankeyModalOpen()) {
+    if (!fillSankeyModal()) closeSankeyModal();
+  }
   if (!world) return;
   // One value function for both views. In the reverse view the selected economy
   // itself has no entry - a country is not its own source - so it falls to the
@@ -839,129 +955,551 @@ function stackSVG(iso) {
    number. */
 const SANKEY_TOP_SOURCES = 6;
 
-function sankeySVG(iso) {
-  const a = currentAttribution();
-  if (!a || a.total == null || !(a.total > 0)) return '';
+/* Two frames over one model. The panel pools the tail because 43 ribbons into
+   four nodes at 268px wide is a hairball; the overlay has the room to show every
+   source individually and therefore must, because the pooled bar is the one
+   thing in the panel a reader cannot interrogate.
 
-  const chanCol = { trade: '#184f95', va: '#184f95', energy: '#256abf', crm: '#3987e5', choke: '#6da7ec' };
-  const chanLbl = { trade: 'Trade', va: 'Trade (VA)', energy: 'Energy', crm: 'Raw mat.', choke: 'Chokepoint' };
+   Gaps are budgeted, not fixed per node. The claim the picture makes - the
+   source column ends short of the channel column by exactly the unattributable
+   share - only holds if both columns spend the same number of pixels on gaps.
+   The old fixed GAP spent 3px between 7 source nodes and 3px between 4 channel
+   nodes, so the panel was already off by ~9px; at 43 source nodes it would have
+   been off by 126px and the residual gap would have read as zero. Both columns
+   now share one budget and the difference between them is residual * scale. */
+const SANKEY_GEOM = {
+  panel: { key: 'panel', W: 268, H: 224, TOP: 13, BOT: 5, GAP: 3,
+           SX: 64, SW: 6, CX: 152, CW: 22, TX: 250, TW: 8,
+           FS: 7, FSC: 6.2, FSH: 6.2, TRUNC: 16, MINH: 0.8, HAIR: 0, pool: SANKEY_TOP_SOURCES },
+  full:  { key: 'full', W: 1120, H: 782, TOP: 40, BOT: 40, GAP: 10,
+           SX: 300, SW: 16, CX: 620, CW: 76, TX: 1030, TW: 26,
+           FS: 12, FSC: 11.5, FSH: 12, TRUNC: 30, MINH: 0, HAIR: 0.5, pool: 0 }
+};
+
+const SANKEY_CHAN_COL = { trade: '#184f95', va: '#184f95', energy: '#256abf', crm: '#3987e5', choke: '#6da7ec' };
+const SANKEY_CHAN_LBL = { trade: 'Trade', va: 'Trade (VA)', energy: 'Energy', crm: 'Raw mat.', choke: 'Chokepoint' };
+
+/* Arithmetic only. Both frames consume this, so a number shown in the overlay
+   tooltip and the same number in the panel cannot drift apart. */
+function sankeyModel(iso, pool) {
+  const a = currentAttribution();
+  if (!a || a.total == null || !(a.total > 0)) return null;
+
   // Chokepoint last, so the band with no source sits at the bottom of the
   // column where the shortfall against the source column reads as one gap.
   const order = [state.basis, 'energy', 'crm', 'choke'];
-
   const chanTotal = {};
   for (const r of a.rows) for (const ch of order) if (r.ch[ch]) chanTotal[ch] = (chanTotal[ch] || 0) + r.ch[ch];
   if (a.residual > 0) chanTotal.choke = a.residual;
   const chans = order.filter(ch => (chanTotal[ch] || 0) > 0);
-  if (!chans.length) return '';
+  if (!chans.length) return null;
 
-  // Top N by contribution, remainder aggregated. 43 ribbons into four nodes is
-  // a hairball; the bar list above already carries the full ranking and the
-  // download carries all of it.
-  const top = a.rows.slice(0, SANKEY_TOP_SOURCES).filter(r => r.total > 0);
-  const restRows = a.rows.slice(SANKEY_TOP_SOURCES).filter(r => r.total > 0);
-  const nodes = top.map(r => ({ key: r.iso, label: NAMES[r.iso] || r.iso, value: r.total, ch: r.ch, share: r.share }));
-  if (restRows.length) {
-    const ch = {}, tot = restRows.reduce((t, r) => t + r.total, 0);
-    for (const r of restRows) for (const k of order) if (r.ch[k]) ch[k] = (ch[k] || 0) + r.ch[k];
-    nodes.push({ key: '_other', label: restRows.length + ' others', value: tot, ch: ch,
-                 share: tot / a.total, other: true });
+  const live = a.rows.filter(r => r.total > 0);
+  let nodes, pooled = 0;
+  if (pool > 0 && live.length > pool + 1) {
+    const top = live.slice(0, pool), rest = live.slice(pool);
+    nodes = top.map(r => ({ key: r.iso, label: NAMES[r.iso] || r.iso, value: r.total, ch: r.ch, share: r.share }));
+    const ch = {}, tot = rest.reduce((t, r) => t + r.total, 0);
+    for (const r of rest) for (const k of order) if (r.ch[k]) ch[k] = (ch[k] || 0) + r.ch[k];
+    nodes.push({ key: '_other', label: rest.length + ' others', value: tot, ch: ch,
+                 share: tot / a.total, other: true, members: rest.length });
+    pooled = rest.length;
+  } else {
+    nodes = live.map(r => ({ key: r.iso, label: NAMES[r.iso] || r.iso, value: r.total, ch: r.ch, share: r.share }));
   }
+  return { iso, a, order, chans, chanTotal, nodes, pooled, allSources: live.length };
+}
 
-  const W = 268, H = 224, TOP = 13, BOT = 5, GAP = 3;
-  const HH = H - TOP - BOT;
-  const SX = 64, SW = 6, CX = 152, CW = 22, TX = 250, TW = 8;
-  // One scale for both columns: the channel column carries the whole Intensity,
-  // the source column only the attributable part, and the difference is the
-  // point of the picture.
-  const scale = (HH - Math.max(0, chans.length - 1) * GAP) / a.total;
-  const hOf = v => Math.max(v > 0 ? 0.8 : 0, v * scale);
+/* Push overlapping labels apart, then remember where each one wanted to be so a
+   leader line can point back at its band. 43 sources span four orders of
+   magnitude: the smallest bands are a fraction of a pixel tall and their labels
+   would otherwise stack on one line. Bands keep their true height - inflating
+   them to fit their labels would inflate the source column and destroy the
+   residual gap, which is the one thing this chart is for. */
+function declutterLabels(items, minGap, lo, hi) {
+  items.sort((p, q) => p.y - q.y);
+  let y = lo;
+  for (const it of items) { it.ly = Math.max(it.y, y); y = it.ly + minGap; }
+  if (y - minGap > hi) {                       // overflowed the bottom: sweep back up
+    let yy = hi;
+    for (let k = items.length - 1; k >= 0; k--) { items[k].ly = Math.min(items[k].ly, yy); yy = items[k].ly - minGap; }
+  }
+  return items;
+}
+
+function sankeyNum(v) { return state.mode === 'rebased' ? v.toFixed(2) : v.toFixed(4); }
+function sankeyUnit() { return state.mode === 'rebased' ? 'index points' : 'units'; }
+
+/* Per cent, at a precision that never prints a real contribution as zero. Two
+   decimals is fine for the pooled panel, but un-pooled there are 117 bands and
+   the smallest are thousandths of a per cent: rounding them to 0.00% made the
+   tooltips sum to 90.49 against an attributed share of 90.58, which is exactly
+   the sort of quietly-not-adding-up this chart is supposed to expose. */
+function sankeyPct(x) {
+  if (x >= 1) return x.toFixed(2);
+  if (x >= 0.01) return x.toFixed(3);
+  return x > 0 ? x.toPrecision(2) : '0';
+}
+
+/* One band's description, used verbatim for the tooltip, the aria-label and the
+   locked read-out, so the three cannot disagree. */
+function sankeyBandText(m, n, ch, v) {
+  return (n.other ? n.label : n.label) + ' → ' + SANKEY_CHAN_LBL[ch]
+    + ' · ' + sankeyNum(v) + ' ' + sankeyUnit()
+    + ' · ' + sankeyPct(v / m.a.total * 100) + '% of ' + (NAMES[m.iso] || m.iso) + '’s Intensity';
+}
+function sankeySrcText(m, n) {
+  const parts = m.chans.filter(ch => n.ch[ch]).map(ch => SANKEY_CHAN_LBL[ch] + ' ' + sankeyPct(n.ch[ch] / m.a.total * 100) + '%');
+  return n.label + ' · ' + sankeyNum(n.value) + ' ' + sankeyUnit()
+    + ' · ' + sankeyPct(n.share * 100) + '% of ' + (NAMES[m.iso] || m.iso) + '’s Intensity'
+    + (parts.length ? ' · via ' + parts.join(', ') : '')
+    + (n.other ? ' (pooled: the ' + n.members + ' smallest sources)' : '');
+}
+function sankeyChanText(m, ch) {
+  const v = m.chanTotal[ch];
+  const feeders = m.nodes.filter(n => n.ch[ch]).length;
+  return SANKEY_CHAN_LBL[ch] + ' · ' + sankeyNum(v) + ' ' + sankeyUnit()
+    + ' · ' + sankeyPct(v / m.a.total * 100) + '% of ' + (NAMES[m.iso] || m.iso) + '’s Intensity'
+    + (ch === 'choke' && m.a.residual > 0
+        ? ' · no source country: chokepoint weight attaches to a strait, so nothing feeds this band from the left'
+        : ' · from ' + feeders + ' source' + (feeders === 1 ? '' : 's'));
+}
+
+/* Renders a model into one frame. `g` is geometry; `interactive` adds the hit
+   targets, tab stops and data attributes the highlight handler reads. The export
+   path re-renders with interactive off rather than stripping attributes back out
+   of live markup, which is the version that used to go stale. */
+function sankeyRender(m, g, interactive) {
+  const a = m.a, chans = m.chans, chanTotal = m.chanTotal, nodes = m.nodes;
+  const HH = g.H - g.TOP - g.BOT;
+
+  // One gap budget for both columns (see SANKEY_GEOM): channel-column overhead
+  // sets it, the source column spends the same, so the height difference between
+  // the columns is exactly residual * scale and nothing else.
+  const budget = Math.max(0, chans.length - 1) * g.GAP;
+  const scale = (HH - budget) / a.total;
+  const srcGap = nodes.length > 1 ? budget / (nodes.length - 1) : 0;
+  // MINH is 0 in the full frame. A minimum band height is a lie about size, and
+  // summed over the twenty-odd sources that contribute less than a tenth of a
+  // per cent it inflated the source column by ~2% of the residual gap - the one
+  // measurement this diagram exists to make. Tiny bands are instead given a
+  // hairline stroke, which renders them without moving anything: visibility
+  // without geometry. They remain a tab stop and a hover target via their label.
+  const hOf = v => Math.max(v > 0 ? g.MINH : 0, v * scale);
+  const hair = g.HAIR ? ` stroke-width="${g.HAIR}" stroke-linejoin="round"` : '';
 
   const sy = {}, cy = {}, cyIn = {}, syOut = {};
-  let y = TOP;
-  for (const n of nodes) { sy[n.key] = { y0: y, h: hOf(n.value) }; syOut[n.key] = y; y += hOf(n.value) + GAP; }
-  const srcBottom = y - GAP;
-  y = TOP;
-  for (const ch of chans) { cy[ch] = { y0: y, h: hOf(chanTotal[ch]) }; cyIn[ch] = y; y += hOf(chanTotal[ch]) + GAP; }
+  let y = g.TOP;
+  for (const n of nodes) { sy[n.key] = { y0: y, h: hOf(n.value) }; syOut[n.key] = y; y += hOf(n.value) + srcGap; }
+  const srcBottom = y - srcGap;
+  y = g.TOP;
+  for (const ch of chans) { cy[ch] = { y0: y, h: hOf(chanTotal[ch]) }; cyIn[ch] = y; y += hOf(chanTotal[ch]) + g.GAP; }
+  const chanBottom = y - g.GAP;
 
-  const ribbon = (x0, y0, x1, y1, h0, h1, fill, op) => {
+  const ribbon = (x0, y0, x1, y1, h0, h1) => {
     const cx = (x0 + x1) / 2;
-    return `<path d="M${x0} ${y0.toFixed(2)} C${cx} ${y0.toFixed(2)} ${cx} ${y1.toFixed(2)} ${x1} ${y1.toFixed(2)}`
-         + ` L${x1} ${(y1 + h1).toFixed(2)} C${cx} ${(y1 + h1).toFixed(2)} ${cx} ${(y0 + h0).toFixed(2)} ${x0} ${(y0 + h0).toFixed(2)} Z"`
-         + ` fill="${fill}" opacity="${op}"/>`;
+    return `M${x0} ${y0.toFixed(2)} C${cx} ${y0.toFixed(2)} ${cx} ${y1.toFixed(2)} ${x1} ${y1.toFixed(2)}`
+         + ` L${x1} ${(y1 + h1).toFixed(2)} C${cx} ${(y1 + h1).toFixed(2)} ${cx} ${(y0 + h0).toFixed(2)} ${x0} ${(y0 + h0).toFixed(2)} Z`;
   };
+  const att = (n, ch) => interactive
+    ? ` tabindex="0" role="img" data-s="${xesc(n.key)}" data-c="${xesc(ch)}" aria-label="${xesc(sankeyBandText(m, n, ch, n.ch[ch]))}"` : '';
 
   let flows = '';
   for (const n of nodes) for (const ch of chans) {
     const v = n.ch[ch];
     if (!v) continue;
     const h = hOf(v);
-    flows += ribbon(SX + SW, syOut[n.key], CX, cyIn[ch], h, h, chanCol[ch], n.other ? '.32' : '.55');
+    flows += `<path class="sk-band" d="${ribbon(g.SX + g.SW, syOut[n.key], g.CX, cyIn[ch], h, h)}"`
+           + ` fill="${SANKEY_CHAN_COL[ch]}"${g.HAIR ? ` stroke="${SANKEY_CHAN_COL[ch]}"${hair}` : ''}`
+           + ` opacity="${n.other ? '.32' : '.55'}"${att(n, ch)}/>`;
     syOut[n.key] += h; cyIn[ch] += h;
   }
   // Channel -> economy. Drawn after the source ribbons so the second bundle
   // reads as one flow converging rather than as more of the same fan.
-  let outY = TOP, conv = '';
+  let outY = g.TOP, conv = '';
   for (const ch of chans) {
     const h = hOf(chanTotal[ch]);
-    conv += ribbon(CX + CW, cy[ch].y0, TX, outY, h, h, chanCol[ch], '.45');
+    conv += `<path class="sk-conv" d="${ribbon(g.CX + g.CW, cy[ch].y0, g.TX, outY, h, h)}"`
+          + ` fill="${SANKEY_CHAN_COL[ch]}" opacity=".45"${interactive ? ` data-c="${xesc(ch)}"` : ''}/>`;
     outY += h;
   }
 
   const trunc = (t, k) => t.length > k ? t.slice(0, k - 1) + '…' : t;
-  let bars = '', labels = '';
-  for (const n of nodes) {
-    const b = sy[n.key];
-    bars += `<rect x="${SX}" y="${b.y0.toFixed(2)}" width="${SW}" height="${b.h.toFixed(2)}" rx="1" fill="${
-      n.other ? 'var(--muted)' : colourFor(bucket(n.share, null))}"/>`;
-    labels += `<text x="${SX - 4}" y="${(b.y0 + b.h / 2 + 2.4).toFixed(2)}" font-size="7" fill="var(--muted)" text-anchor="end">${
-      xesc(trunc(n.label, 16))}</text>`;
+  const lblGap = g.FS * 1.16;
+  const rows = declutterLabels(nodes.map(n => ({ key: n.key, n: n, y: sy[n.key].y0 + sy[n.key].h / 2 })),
+                               lblGap, g.TOP + g.FS * 0.5, g.H - g.BOT);
+
+  let srcNodes = '';
+  for (const r of rows) {
+    const n = r.n, b = sy[n.key];
+    const fill = n.other ? 'var(--muted)' : colourFor(bucket(n.share, null));
+    const lead = Math.abs(r.ly - r.y) > 0.8
+      ? `<path class="sk-lead" d="M${(g.SX - 3).toFixed(1)} ${r.ly.toFixed(2)} L${(g.SX - 1.5).toFixed(1)} ${r.y.toFixed(2)} L${g.SX} ${r.y.toFixed(2)}"`
+        + ` fill="none" stroke="var(--muted)" stroke-width=".4" opacity=".55"/>` : '';
+    // The label doubles as the hit target. At full size the smallest sources are
+    // a fraction of a pixel tall; their name is the only thing a pointer can
+    // realistically land on, which is also how the reference chart behaves.
+    const hit = interactive
+      ? `<rect class="sk-hit" x="${(g.SX - 4 - (g.TRUNC * g.FS * 0.55)).toFixed(1)}" y="${(r.ly - lblGap / 2).toFixed(2)}"`
+        + ` width="${(g.TRUNC * g.FS * 0.55 + 4 + g.SW).toFixed(1)}" height="${lblGap.toFixed(2)}" fill="transparent"/>` : '';
+    srcNodes += `<g class="sk-node sk-src"${interactive
+        ? ` tabindex="0" role="img" data-n="${xesc(n.key)}" aria-label="${xesc(sankeySrcText(m, n))}"` : ''}>`
+      + lead
+      + `<rect class="sk-bar" x="${g.SX}" y="${b.y0.toFixed(2)}" width="${g.SW}" height="${b.h.toFixed(2)}" rx="1" fill="${fill}"${
+          g.HAIR ? ` stroke="${fill}"${hair}` : ''}/>`
+      + `<text x="${g.SX - 5}" y="${(r.ly + g.FS * 0.34).toFixed(2)}" font-size="${g.FS}" fill="var(--muted)" text-anchor="end">${
+          xesc(trunc(n.label, g.TRUNC))}</text>`
+      + hit + `</g>`;
   }
+
+  let chanNodes = '';
   for (const ch of chans) {
     const b = cy[ch];
-    bars += `<rect x="${CX}" y="${b.y0.toFixed(2)}" width="${CW}" height="${b.h.toFixed(2)}" rx="1" fill="${chanCol[ch]}"/>`;
-    // Inline only where the band is tall enough to hold it; the key below is
-    // what the reader is actually meant to rely on.
-    if (b.h >= 9) labels += `<text x="${CX + CW / 2}" y="${(b.y0 + b.h / 2 + 2.2).toFixed(2)}" font-size="6.2" fill="#e6edf3" text-anchor="middle">${
-      xesc(trunc(chanLbl[ch], 10))}</text>`;
+    chanNodes += `<g class="sk-node sk-chan"${interactive
+        ? ` tabindex="0" role="img" data-n="ch:${xesc(ch)}" data-c="${xesc(ch)}" aria-label="${xesc(sankeyChanText(m, ch))}"` : ''}>`
+      + `<rect class="sk-bar" x="${g.CX}" y="${b.y0.toFixed(2)}" width="${g.CW}" height="${b.h.toFixed(2)}" rx="1" fill="${SANKEY_CHAN_COL[ch]}"/>`
+      // Inline only where the band is tall enough to hold it; the key below is
+      // what the reader is actually meant to rely on.
+      + (b.h >= g.FSC * 1.5
+          ? `<text x="${g.CX + g.CW / 2}" y="${(b.y0 + b.h / 2 + g.FSC * 0.35).toFixed(2)}" font-size="${g.FSC}" fill="#e6edf3" text-anchor="middle">${
+              xesc(trunc(SANKEY_CHAN_LBL[ch], g.key === 'panel' ? 10 : 14))}</text>`
+          : '')
+      + `</g>`;
   }
-  bars += `<rect x="${TX}" y="${TOP}" width="${TW}" height="${(a.total * scale).toFixed(2)}" rx="1" fill="var(--ink)" opacity=".75"/>`;
 
-  // The chokepoint band has no left-hand ribbon. Say so where it happens rather
-  // than only in the caption, or it reads as a rendering fault.
+  const tgt = `<g class="sk-node sk-tgt"${interactive
+      ? ` tabindex="0" role="img" data-n="_target" aria-label="${xesc((NAMES[m.iso] || m.iso) + ' total Intensity '
+          + sankeyNum(a.total) + ' ' + sankeyUnit() + ' at ' + state.months[state.idx] + ', 100%')}"` : ''}>`
+    + `<rect class="sk-bar" x="${g.TX}" y="${g.TOP}" width="${g.TW}" height="${(a.total * scale + budget).toFixed(2)}" rx="1" fill="var(--ink)" opacity=".75"/></g>`;
+
+  /* The chokepoint band has no left-hand ribbon. Say so where it happens rather
+     than only in the caption, or it reads as a rendering fault. At full size the
+     gap is also bracketed and numbered: a reader who can see 43 sources should
+     not have to infer the one quantity that has none. */
   let stub = '';
-  if (chanTotal.choke > 0) {
-    const b = cy.choke;
-    stub += `<line x1="${SX + SW}" y1="${(b.y0 + b.h / 2).toFixed(2)}" x2="${CX}" y2="${(b.y0 + b.h / 2).toFixed(2)}" stroke="var(--warn)" stroke-width="0.7" stroke-dasharray="2 2" opacity=".8"/>`
-       + `<text x="${((SX + SW + CX) / 2).toFixed(1)}" y="${(b.y0 + b.h / 2 - 3).toFixed(2)}" font-size="6" fill="var(--warn)" text-anchor="middle">no source country</text>`;
+  if (chanTotal.choke > 0 && a.residual > 0) {
+    const b = cy.choke, mid = b.y0 + b.h / 2;
+    stub += `<line class="sk-note" x1="${g.SX + g.SW}" y1="${mid.toFixed(2)}" x2="${g.CX}" y2="${mid.toFixed(2)}" stroke="var(--warn)" stroke-width="${g.key === 'panel' ? 0.7 : 1.2}" stroke-dasharray="${g.key === 'panel' ? '2 2' : '4 4'}" opacity=".8"/>`
+      + `<text class="sk-note" x="${((g.SX + g.SW + g.CX) / 2).toFixed(1)}" y="${(mid - (g.key === 'panel' ? 3 : 7)).toFixed(2)}" font-size="${g.FSH}" fill="var(--warn)" text-anchor="middle">no source country</text>`;
+    if (g.key === 'full') {
+      // Bracket the shortfall and number it. The label goes below everything
+      // rather than beside the bracket: beside it, it collided with the "no
+      // source country" stub, and two warnings overprinting each other is worse
+      // than either alone.
+      const x = g.SX + g.SW + 10;
+      stub += `<path class="sk-note" d="M${(x + 9)} ${srcBottom.toFixed(2)} L${x} ${srcBottom.toFixed(2)} L${x} ${chanBottom.toFixed(2)} L${(x + 9)} ${chanBottom.toFixed(2)}"`
+        + ` fill="none" stroke="var(--warn)" stroke-width="1.2" opacity=".9"/>`
+        + `<text class="sk-note" x="${x}" y="${(chanBottom + 21).toFixed(2)}" font-size="${g.FSH}" fill="var(--warn)">${
+            xesc('The source column ends ' + (a.residualShare * 100).toFixed(1)
+                 + '% short of the channel column: chokepoint transit weights a strait, not a country.')}</text>`;
+    }
   }
 
-  const hdr = `<text x="${SX + SW}" y="7" font-size="6.2" fill="var(--muted)" text-anchor="end">SOURCE</text>`
-    + `<text x="${CX}" y="7" font-size="6.2" fill="var(--muted)">CHANNEL</text>`
-    + `<text x="${TX + TW / 2}" y="7" font-size="6.2" fill="var(--muted)" text-anchor="middle">${xesc(iso)}</text>`;
+  const hdr = `<text class="sk-note" x="${g.SX + g.SW}" y="${(g.TOP - 6).toFixed(1)}" font-size="${g.FSH}" fill="var(--muted)" text-anchor="end">SOURCE</text>`
+    + `<text class="sk-note" x="${g.CX}" y="${(g.TOP - 6).toFixed(1)}" font-size="${g.FSH}" fill="var(--muted)">CHANNEL</text>`
+    + `<text class="sk-note" x="${g.TX + g.TW / 2}" y="${(g.TOP - 6).toFixed(1)}" font-size="${g.FSH}" fill="var(--muted)" text-anchor="middle">${xesc(m.iso)}</text>`;
 
-  const chanPct = chans.map(ch => chanLbl[ch] + ' ' + Math.round(chanTotal[ch] / a.total * 100) + '%').join(', ');
+  const chanPct = chans.map(ch => SANKEY_CHAN_LBL[ch] + ' ' + Math.round(chanTotal[ch] / a.total * 100) + '%').join(', ');
   const topPct = nodes.filter(n => !n.other).slice(0, 3)
     .map(n => n.label + ' ' + (n.share * 100).toFixed(1) + '%').join(', ');
-  const alt = `Sources of ${NAMES[iso] || iso}'s Intensity at ${state.months[state.idx]}, routed through channels. `
+  const alt = `Sources of ${NAMES[m.iso] || m.iso}'s Intensity at ${state.months[state.idx]}, routed through channels. `
     + `By channel: ${chanPct}. Largest sources: ${topPct}. `
+    + (m.pooled ? `${m.pooled} smaller sources are pooled into one band. ` : `All ${m.allSources} sources are shown individually. `)
     + (a.residual > 0
         ? `The chokepoint band, ${(a.residualShare * 100).toFixed(1)} per cent, enters with no source country and is left unattributed.`
         : `The chokepoint slider is at zero, so every band has a source.`);
 
-  const key = chans.map(ch => `<span><i style="background:${chanCol[ch]}"></i>${chanLbl[ch]} ${
+  // role=group, not role=img: role=img makes descendants presentational, which
+  // would hide every band and node this chart just made focusable.
+  const svg = `<svg class="sankey${interactive ? ' sk-live' : ''}" viewBox="0 0 ${g.W} ${g.H}"`
+    + ` role="${interactive ? 'group' : 'img'}" aria-label="${xesc(alt)}"${interactive ? ` data-frame="${g.key}"` : ''}>`
+    + `<desc>${xesc(alt)}</desc>${flows}${conv}${stub}${srcNodes}${chanNodes}${tgt}${hdr}</svg>`;
+
+  const key = chans.map(ch => `<span><i style="background:${SANKEY_CHAN_COL[ch]}"></i>${SANKEY_CHAN_LBL[ch]} ${
     Math.round(chanTotal[ch] / a.total * 100)}%</span>`).join('');
 
-  return `<svg class="sankey" viewBox="0 0 ${W} ${H}" role="img" aria-label="${xesc(alt)}">${flows}${conv}${stub}${bars}${labels}${hdr}</svg>`
-    + `<div class="stack-key sankey-key">${key}</div>`
-    + `<p class="cap sankey-cap">Band width is share of ${xesc(NAMES[iso] || iso)}’s Intensity at ${state.months[state.idx]}. `
+  const cap = `Band width is share of ${xesc(NAMES[m.iso] || m.iso)}’s Intensity at ${state.months[state.idx]}. `
     + `Source bars are coloured by the same breaks as the map. `
-    + (restRows.length ? `The ${restRows.length} smallest sources are pooled; the list above ranks all ${a.rows.length}. ` : '')
+    + (m.pooled
+        ? `The ${m.pooled} smallest sources are pooled; the list above ranks all ${m.allSources}, and the expanded view shows every one of them separately. `
+        : `All ${m.allSources} source countries are shown individually; labels are spread apart where bands are too thin to carry them, and a leader line points back to each band. `)
+    + `Contributions sum to the ${(a.attributedShare * 100).toFixed(1)}% attributed share, and attributed plus chokepoint is the whole of this economy’s Intensity, to the two decimals the payload stores the channel series in. `
     + (a.residual > 0
         ? `The chokepoint band has no inflow because its weight attaches to a strait, not a country — the source column ends ${(a.residualShare * 100).toFixed(1)}% short of the channel column for that reason.`
-        : `Chokepoint is at zero, so the two columns are the same height.`)
-    + `</p>`;
+        : `Chokepoint is at zero, so the two columns are the same height.`);
+
+  return { svg, key, cap, alt, W: g.W, H: g.H };
 }
+
+function sankeySVG(iso) {
+  const m = sankeyModel(iso, SANKEY_GEOM.panel.pool);
+  if (!m) return '';
+  const r = sankeyRender(m, SANKEY_GEOM.panel, true);
+  // Every band is a tab stop, which is the point - and 33 of them is a wall for
+  // anyone trying to reach the controls underneath. The dialog gets a skip link;
+  // so does the panel.
+  return `<a class="skiplink" href="#sankeyPanelEnd">Skip the routing diagram</a>`
+    + `<div class="sankey-wrap" id="sankeyPanel" role="button" tabindex="0"`
+       + ` aria-label="Expand the source routing diagram to full window, showing all ${m.allSources} sources individually">${r.svg}`
+       + `<span class="sankey-expand" aria-hidden="true">Expand ⤢</span></div>`
+    + `<div class="stack-key sankey-key">${r.key}</div>`
+    + `<p class="cap sankey-cap" id="sankeyPanelEnd" tabindex="-1">${r.cap}</p>`;
+}
+
+// ---------------------------------------------------------------------------
+// Sankey interaction: highlight, tooltip, expanded view
+// ---------------------------------------------------------------------------
+/* Highlighting is a pointer, a focus and a lock behaviour over one lit-set
+   computation, so the three can never light different things. The tooltip text
+   is the element's own aria-label, verbatim - not a parallel string built from
+   the same numbers, which is how the two drift apart. */
+
+let skLock = null;          // {svg, el} while a selection is pinned
+let skReturnFocus = null;   // element to restore when the dialog closes
+
+function sankeyLitSet(svg, el) {
+  const q = sel => Array.from(svg.querySelectorAll(sel));
+  const tgt = q('.sk-tgt');
+  if (el.classList.contains('sk-band')) {
+    const s = el.dataset.s, c = el.dataset.c;
+    return [el].concat(q('.sk-src[data-n="' + CSS.escape(s) + '"]'),
+                       q('.sk-chan[data-n="ch:' + CSS.escape(c) + '"]'),
+                       q('.sk-conv[data-c="' + CSS.escape(c) + '"]'), tgt);
+  }
+  const n = el.dataset.n;
+  if (n === '_target') return [el].concat(q('.sk-conv'), q('.sk-chan'));
+  if (el.classList.contains('sk-chan')) {
+    const c = el.dataset.c;
+    const bands = q('.sk-band[data-c="' + CSS.escape(c) + '"]');
+    // Every source feeding this channel, derived from the bands that exist
+    // rather than from a second pass over the model.
+    const srcs = bands.map(b => q('.sk-src[data-n="' + CSS.escape(b.dataset.s) + '"]')[0]).filter(Boolean);
+    return [el].concat(bands, srcs, q('.sk-conv[data-c="' + CSS.escape(c) + '"]'), tgt);
+  }
+  const bands = q('.sk-band[data-s="' + CSS.escape(n) + '"]');
+  const chans = bands.map(b => q('.sk-chan[data-n="ch:' + CSS.escape(b.dataset.c) + '"]')[0]).filter(Boolean);
+  const convs = bands.map(b => q('.sk-conv[data-c="' + CSS.escape(b.dataset.c) + '"]')[0]).filter(Boolean);
+  return [el].concat(bands, chans, convs, tgt);
+}
+
+function sankeyClear(svg) {
+  if (!svg) return;
+  svg.classList.remove('sk-hl');
+  svg.querySelectorAll('.sk-lit').forEach(e => e.classList.remove('sk-lit'));
+}
+
+function sankeyLight(svg, el) {
+  sankeyClear(svg);
+  if (!el) return;
+  svg.classList.add('sk-hl');
+  for (const e of sankeyLitSet(svg, el)) e.classList.add('sk-lit');
+}
+
+/* The tooltip renders the aria-label the element already carries, split on the
+   separator the label builders use. A sighted reader and a screen-reader user
+   therefore get the same sentence, not two versions of it. */
+function sankeyTipHTML(el) {
+  const raw = el.getAttribute('aria-label') || '';
+  const parts = raw.split(' · ');
+  const head = parts.shift() || '';
+  const warn = parts.filter(p => /no source country/.test(p));
+  const rest = parts.filter(p => !/no source country/.test(p));
+  return '<b>' + xesc(head) + '</b>'
+    + (rest.length ? '<span class="tm">' + xesc(rest.join(' · ')) + '</span>' : '')
+    + (warn.length ? '<span class="tm tw">' + xesc(warn.join(' · ')) + '</span>' : '');
+}
+
+function sankeyTipEl() {
+  let t = document.getElementById('sankeyTip');
+  if (!t) { t = document.createElement('div'); t.id = 'sankeyTip'; t.hidden = true; document.body.appendChild(t); }
+  return t;
+}
+
+function sankeyTipShow(el, x, y) {
+  const t = sankeyTipEl();
+  t.innerHTML = sankeyTipHTML(el);
+  t.hidden = false;
+  const r = t.getBoundingClientRect(), pad = 12;
+  let left = x + 14, top = y + 14;
+  if (left + r.width > innerWidth - pad) left = x - r.width - 14;
+  if (top + r.height > innerHeight - pad) top = y - r.height - 14;
+  t.style.left = Math.max(pad, left) + 'px';
+  t.style.top = Math.max(pad, top) + 'px';
+}
+
+function sankeyTipAt(el) {                 // keyboard: anchor to the element itself
+  const b = el.getBoundingClientRect();
+  sankeyTipShow(el, b.left + b.width / 2, b.bottom);
+}
+
+function sankeyTipHide() { const t = document.getElementById('sankeyTip'); if (t) t.hidden = true; }
+
+function sankeyTarget(e) {
+  const el = e.target instanceof Element ? e.target.closest('.sk-band, .sk-node') : null;
+  return el && el.closest('svg.sk-live') ? el : null;
+}
+
+function sankeyLockUI() {
+  const btn = document.getElementById('skClear'), lbl = document.getElementById('skLock');
+  if (!btn || !lbl) return;
+  btn.hidden = !skLock;
+  lbl.textContent = skLock
+    ? 'Locked on: ' + (skLock.el.getAttribute('aria-label') || '').split(' · ')[0]
+    : 'Hover or focus a band to trace it. Tap to lock on a touch screen.';
+}
+
+function sankeySetLock(svg, el) {
+  skLock = el ? { svg, el } : null;
+  if (el) { sankeyLight(svg, el); sankeyTipAt(el); }
+  else { sankeyClear(svg); sankeyTipHide(); }
+  sankeyLockUI();
+  const live = document.getElementById('liveRegion');
+  if (live && el) live.textContent = el.getAttribute('aria-label') || '';
+}
+
+/* Pointer. A locked selection outranks hover, so a touch user who has tapped a
+   band does not lose it to a stray pointer event on the way to reading it. */
+document.addEventListener('pointerover', e => {
+  const el = sankeyTarget(e);
+  if (!el || skLock) return;
+  sankeyLight(el.closest('svg.sk-live'), el);
+  sankeyTipShow(el, e.clientX, e.clientY);
+});
+document.addEventListener('pointermove', e => {
+  if (skLock) return;
+  const el = sankeyTarget(e);
+  if (el) sankeyTipShow(el, e.clientX, e.clientY);
+});
+document.addEventListener('pointerout', e => {
+  const el = sankeyTarget(e);
+  if (!el || skLock) return;
+  const to = e.relatedTarget instanceof Element ? e.relatedTarget.closest('.sk-band, .sk-node') : null;
+  if (to) return;
+  sankeyClear(el.closest('svg.sk-live'));
+  sankeyTipHide();
+});
+
+/* Focus parity: Tab lights exactly what hover lights, and announces it. */
+document.addEventListener('focusin', e => {
+  const el = sankeyTarget(e);
+  if (!el) return;
+  if (skLock) sankeySetLock(skLock.svg, null);
+  sankeyLight(el.closest('svg.sk-live'), el);
+  sankeyTipAt(el);
+});
+document.addEventListener('focusout', e => {
+  const el = sankeyTarget(e);
+  if (!el || skLock) return;
+  sankeyClear(el.closest('svg.sk-live'));
+  sankeyTipHide();
+});
+
+/* Click. In the panel a click opens the expanded view - that is the stated
+   gesture and overloading it with a lock would make the panel chart behave one
+   way with a mouse and another with a finger. Locking lives in the expanded
+   view, where there is room to read what has been locked. */
+document.addEventListener('click', e => {
+  const wrap = e.target instanceof Element ? e.target.closest('#sankeyPanel') : null;
+  if (wrap) { e.preventDefault(); openSankeyModal(); return; }
+  const el = sankeyTarget(e);
+  if (el && el.closest('#skBody')) {
+    const svg = el.closest('svg.sk-live');
+    sankeySetLock(svg, skLock && skLock.el === el ? null : el);
+    e.stopPropagation();
+    return;
+  }
+  if (skLock && e.target instanceof Element && e.target.closest('#skBody')) sankeySetLock(skLock.svg, null);
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const wrap = e.target instanceof Element ? e.target.closest('#sankeyPanel') : null;
+  if (wrap) { e.preventDefault(); openSankeyModal(); return; }
+  const el = sankeyTarget(e);
+  if (el && el.closest('#skBody')) {
+    e.preventDefault();
+    const svg = el.closest('svg.sk-live');
+    sankeySetLock(svg, skLock && skLock.el === el ? null : el);
+  }
+});
+
+// --- expanded view -------------------------------------------------------
+const SK_INERT = ['map', 'left', 'detail', 'banner'];
+
+function sankeyModalOpen() { const m = document.getElementById('sankeyModal'); return m && !m.hidden; }
+
+function fillSankeyModal() {
+  const iso = state.selected;
+  const m = iso ? sankeyModel(iso, SANKEY_GEOM.full.pool) : null;
+  if (!m) return false;
+  const r = sankeyRender(m, SANKEY_GEOM.full, true);
+  document.getElementById('skTitle').textContent = (NAMES[iso] || iso) + ' — source routing';
+  document.getElementById('skSub').textContent = iso + ' · ' + state.months[state.idx]
+    + ' · ' + state.mode + ' · all ' + m.allSources + ' source countries, none pooled';
+  document.getElementById('skBody').innerHTML = r.svg;
+  document.getElementById('skKey').innerHTML = r.key;
+  document.getElementById('skCap').innerHTML = r.cap;
+  skLock = null;
+  sankeyLockUI();
+  return true;
+}
+
+function openSankeyModal() {
+  if (!fillSankeyModal()) return;
+  skReturnFocus = document.activeElement;
+  const modal = document.getElementById('sankeyModal');
+  modal.hidden = false;
+  for (const id of SK_INERT) { const el = document.getElementById(id); if (el) { el.inert = true; el.setAttribute('aria-hidden', 'true'); } }
+  document.getElementById('skClose').focus();
+  document.getElementById('liveRegion').textContent =
+    'Expanded routing view opened. All source countries shown individually. Press Escape to close.';
+}
+
+function closeSankeyModal() {
+  const modal = document.getElementById('sankeyModal');
+  if (!modal || modal.hidden) return;
+  skLock = null;
+  sankeyTipHide();
+  modal.hidden = true;
+  document.getElementById('skBody').innerHTML = '';
+  for (const id of SK_INERT) { const el = document.getElementById(id); if (el) { el.inert = false; el.removeAttribute('aria-hidden'); } }
+  const back = skReturnFocus && document.contains(skReturnFocus)
+    ? skReturnFocus : document.getElementById('sankeyPanel');
+  if (back && back.focus) back.focus();
+  skReturnFocus = null;
+}
+
+document.getElementById('skClose').addEventListener('click', closeSankeyModal);
+document.getElementById('skClear').addEventListener('click', () => {
+  const svg = document.querySelector('#skBody svg.sk-live');
+  sankeySetLock(svg, null);
+  if (svg) svg.focus && document.getElementById('skClear').blur();
+});
+// Click outside the card closes. The card stops the event so a click inside it
+// - including one that lands between bands - never closes the dialog.
+document.getElementById('sankeyModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('sankeyModal')) closeSankeyModal();
+});
+
+/* Focus trap. Cycles within the card so Tab cannot reach the map behind it;
+   `inert` above already removes the background from the accessibility tree, and
+   this keeps the loop honest in browsers that ship one but not the other. */
+document.addEventListener('keydown', e => {
+  if (!sankeyModalOpen()) return;
+  if (e.key === 'Escape') { e.preventDefault(); closeSankeyModal(); return; }
+  if (e.key !== 'Tab') return;
+  const card = document.getElementById('skCard');
+  const f = Array.from(card.querySelectorAll('a[href], button:not([disabled]), [tabindex]'))
+    .filter(el => el.tabIndex >= 0 && el.offsetParent !== null || el.ownerSVGElement);
+  if (!f.length) return;
+  const first = f[0], last = f[f.length - 1];
+  if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+  else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+document.getElementById('skFoot').addEventListener('click', e => {
+  const b = e.target.closest('[data-chart]');
+  if (b) exportChart(b.dataset.chart, b.dataset.root);
+});
 
 /* Reverse-view panel. Deliberately not a variant of the exposure panel: it
    answers a different question, in different units, and the number that must
@@ -1403,62 +1941,90 @@ function wrapText(s, per) {
   return out;
 }
 
-function chartFigure(which) {
+/* `where` is 'modal' for the expanded view, anything else for the panel. The
+   expanded export is re-rendered from the model with interaction off rather than
+   scraped out of the live DOM: a scraped copy would carry tab stops, hit
+   rectangles and whatever was lit at the moment of the click into a static file.
+   Header type scales with the frame so the 1120px figure is not captioned in
+   6pt. */
+function chartFigure(which, where) {
   const iso = state.selected;
   if (!iso) return null;
-  const node = document.querySelector('#detail svg.' + which);
+  const modal = where === 'modal';
+  let node, capOverride = null, keyRoot = document.getElementById('detail');
+  if (which === 'sankey') {
+    // Both frames re-render from the model with interaction off. Scraping the
+    // live panel instead shipped 33 tab stops and a set of invisible hit
+    // rectangles into a static file that has nothing to interact with.
+    const g = modal ? SANKEY_GEOM.full : SANKEY_GEOM.panel;
+    const m = sankeyModel(iso, g.pool);
+    if (!m) return null;
+    const r = sankeyRender(m, g, false);
+    const holder = document.createElement('div');
+    holder.innerHTML = r.svg;
+    node = holder.firstElementChild;
+    capOverride = r.cap;
+    if (modal) keyRoot = document.getElementById('skFoot');
+  } else {
+    node = document.querySelector('#detail svg.' + which);
+  }
   if (!node) return null;
 
   const cs = getComputedStyle(document.documentElement);
   const V = n => cs.getPropertyValue('--' + n).trim();
-  const CW = 268, PAD = 12, W = CW + PAD * 2;
+  const CW = parseFloat(node.getAttribute('viewBox').split(/\s+/)[2]) || 268;
+  const K = CW / 268;                       // type scale: keep the header legible at full size
+  const PAD = 12 * K, W = CW + PAD * 2;
   const CH = parseFloat(node.getAttribute('viewBox').split(/\s+/)[3]);
   const inner = node.outerHTML
     .replace(/var\(--([a-z]+)\)/g, (_, n) => V(n))
     .replace(/^<svg /, '<svg width="' + CW + '" height="' + CH + '" ');
 
   const t = (x, y, str, size, fill, extra) =>
-    '<text x="' + x + '" y="' + y.toFixed(1) + '" font-size="' + size + '" fill="' + fill + '"'
+    '<text x="' + x + '" y="' + y.toFixed(1) + '" font-size="' + (size * K).toFixed(2) + '" fill="' + fill + '"'
     + (extra || '') + '>' + xesc(str) + '</text>';
 
   const heading = which === 'spark' ? 'Intensity'
                 : which === 'sankey' ? 'Source routing' : 'Channel composition';
   const last = state.months[state.months.length - 1];
-  let y = PAD + 9, body = '';
-  body += t(PAD, y, (NAMES[iso] || iso) + ' — ' + heading, 11, V('ink'), ' font-weight="600"');
-  y += 10.5;
+  let y = PAD + 9 * K, body = '';
+  body += t(PAD, y, (NAMES[iso] || iso) + ' — ' + heading + (modal ? ' (expanded, all sources)' : ''),
+            11, V('ink'), ' font-weight="600"');
+  y += 10.5 * K;
   // The Sankey is one month, not a series; saying "1985-01 to 2026-08" over a
   // snapshot would misdate every band in it.
   body += t(PAD, y, which === 'sankey'
     ? iso + ' · ' + state.months[state.idx] + ' · ' + state.mode + ' · channel mix as set'
     : iso + ' · ' + state.months[0] + ' to ' + last + ' · ' + state.mode
       + ' · marker at ' + state.months[state.idx], 7, V('muted'));
-  y += 10;
+  y += 10 * K;
 
   const chartY = y;
-  y += CH + 10;
+  y += CH + 10 * K;
 
   if (which === 'spark') {
     const parts = [...document.querySelectorAll('#detail .spark-cap span')].map(e => e.textContent.trim());
     body += t(PAD, y, parts[0] || '', 7, V('muted'));
     body += t(W / 2, y, parts[1] || '', 7, V('muted'), ' text-anchor="middle"');
     body += t(W - PAD, y, parts[2] || '', 7, V('muted'), ' text-anchor="end"');
-    y += 12;
+    y += 12 * K;
   } else {
     let x = PAD, rows = 0;
-    for (const sp of document.querySelectorAll('#detail .stack-key span')) {
+    for (const sp of keyRoot.querySelectorAll('.stack-key span')) {
       const sw = sp.querySelector('i'), lbl = sp.textContent.trim();
-      const wpx = lbl.length * 3.8 + 14;
+      const wpx = (lbl.length * 3.8 + 14) * K;
       if (x + wpx > W - PAD) { x = PAD; rows++; }
-      const yy = y + rows * 10;
-      body += '<rect x="' + x + '" y="' + (yy - 5).toFixed(1) + '" width="6" height="6" rx="1" fill="'
-        + (sw ? getComputedStyle(sw).backgroundColor : V('accent')) + '"/>' + t(x + 9, yy, lbl, 7, V('muted'));
+      const yy = y + rows * 10 * K;
+      body += '<rect x="' + x.toFixed(1) + '" y="' + (yy - 5 * K).toFixed(1) + '" width="' + (6 * K).toFixed(1)
+        + '" height="' + (6 * K).toFixed(1) + '" rx="1" fill="'
+        + (sw ? getComputedStyle(sw).backgroundColor : V('accent')) + '"/>' + t(x + 9 * K, yy, lbl, 7, V('muted'));
       x += wpx;
     }
-    y += rows * 10 + 12;
+    y += rows * 10 * K + 12 * K;
   }
 
-  const panelCap = which === 'stack' ? (document.querySelector('#detail .cap') || {}).textContent
+  const panelCap = capOverride ? capOverride
+                 : which === 'stack' ? (document.querySelector('#detail .cap') || {}).textContent
                  : which === 'sankey' ? (document.querySelector('#detail .sankey-cap') || {}).textContent
                  : '';
   const caps = [panelCap,
@@ -1476,12 +2042,12 @@ function chartFigure(which) {
         + '; weights carried forward and increasingly unrepresentative.' : '',
     'Contemporaneous measure of reported exposure, not a forecast. The channel mix is a sensitivity analysis, not a ranking.',
   ].filter(Boolean);
-  for (const c of caps) for (const line of wrapText(c.trim(), 76)) { body += t(PAD, y, line, 6.3, V('muted')); y += 7.8; }
+  for (const c of caps) for (const line of wrapText(c.trim(), 76)) { body += t(PAD, y, line, 6.3, V('muted')); y += 7.8 * K; }
 
-  y += 3;
+  y += 3 * K;
   body += t(PAD, y, 'Ribat · ' + (location.host || 'sam0urr.github.io') + ' · downloaded '
     + new Date().toISOString().slice(0, 10), 6.3, V('muted'));
-  for (const line of wrapText(CITATION, 80)) { y += 7.8; body += t(PAD, y, line, 6.3, V('muted')); }
+  for (const line of wrapText(CITATION, 80)) { y += 7.8 * K; body += t(PAD, y, line, 6.3, V('muted')); }
   y += PAD;
 
   const H = Math.ceil(y);
@@ -1490,23 +2056,24 @@ function chartFigure(which) {
     + '" role="img" aria-label="' + xesc(node.getAttribute('aria-label') || '') + '">'
     + '<title>' + xesc((NAMES[iso] || iso) + ' — ' + heading + ', ' + state.months[0] + ' to ' + last) + '</title>'
     + '<rect width="' + W + '" height="' + H + '" fill="' + V('panel') + '"/>'
-    + '<g transform="translate(' + PAD + ' ' + chartY.toFixed(1) + ')">' + inner + '</g>'
+    + '<g transform="translate(' + PAD.toFixed(1) + ' ' + chartY.toFixed(1) + ')">' + inner + '</g>'
     + body + '</svg>\n';
   return { svg, name: 'ribat_' + iso + '_'
     + (which === 'spark' ? 'intensity' : which === 'sankey' ? 'routing' : 'composition')
-    + '_' + state.months[state.idx] + '.svg' };
+    + (modal ? '_expanded' : '') + '_' + state.months[state.idx] + '.svg' };
 }
 
-function exportChart(which) {
-  const fig = chartFigure(which);
+function exportChart(which, where) {
+  const fig = chartFigure(which, where);
   if (fig) saveFile(fig.name, fig.svg, 'image/svg+xml');
+  else document.getElementById('liveRegion').textContent = 'Chart unavailable for download.';
 }
 
 /* The panel is rebuilt with innerHTML on every render, so per-button handlers
    would not survive; delegate from the container instead. */
 document.getElementById('detail').addEventListener('click', e => {
   const b = e.target.closest('[data-chart]');
-  if (b) exportChart(b.dataset.chart);
+  if (b) exportChart(b.dataset.chart, b.dataset.root);
 });
 
 /* Map PNG. A bare canvas grab would be a picture of colours with no scale -
