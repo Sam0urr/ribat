@@ -392,6 +392,49 @@ def main() -> int:
     check("CITATION" in png_body,
           "PNG footer carries the citation")
 
+    section("map coverage")
+    # The render loop skips features MapLibre cannot key state by. That skip is
+    # silent by construction, so a payload economy whose geometry lost its id
+    # would simply stop being coloured without anything raising. These checks
+    # are what make the skip safe to keep: they fail if the map ever stops
+    # being able to paint something the data can colour.
+    topo = json.loads((ROOT / "web" / "data" / "countries-50m.json")
+                      .read_text(encoding="utf-8"))
+    geoms = topo["objects"]["countries"]["geometries"]
+    table = html.split("const NUM_TO_A3 =")[-1].split("};")[0]
+    num_to_a3 = {int(n): a3 for n, a3 in re.findall(r"(\d+)\s*:\s*'([A-Z]{3})'", table)}
+    check(bool(num_to_a3), f"NUM_TO_A3 parsed from index.html ({len(num_to_a3)} entries)")
+
+    # Natural Earth zero-pads its numeric ids ("032"), so the lookup must pass
+    # through int() exactly as the page passes through Number(f.id). Comparing
+    # the padded string against the table would match nothing and report every
+    # country unreachable.
+    paintable = {num_to_a3[int(g["id"])] for g in geoms
+                 if g.get("id") is not None and int(g["id"]) in num_to_a3}
+
+    payload: set[str] = set()
+    for fname, key in (("gpr.json", "countries"), ("intensity.json", "countries"),
+                       ("weights.json", "w")):
+        f = ROOT / "web" / "data" / fname
+        if f.exists():
+            payload |= set(json.loads(f.read_text(encoding="utf-8")).get(key) or {})
+    orphans = sorted(payload - paintable)
+    check(not orphans,
+          f"every payload economy reaches a paintable feature ({len(payload)} checked)"
+          + ("" if not orphans else " -> unreachable: " + ", ".join(orphans[:5])))
+
+    # An entry no feature id matches is a mistyped or retired code. It colours
+    # nothing, and nothing else in this file would report it.
+    dead = sorted(set(num_to_a3.values()) - paintable)
+    check(not dead, "no NUM_TO_A3 entry is unmatched by a feature id"
+          + ("" if not dead else " -> " + ", ".join(dead[:5])))
+
+    # Guards the guard: without it setFeatureState is handed an undefined id and
+    # MapLibre answers with an ErrorEvent for each such feature on every repaint.
+    check("if (f.id == null) continue;" in html,
+          "render loop skips id-less features instead of calling setFeatureState "
+          "on them")
+
     # ── result --------------------------------------------------------------
     print()
     for w in WARN:
