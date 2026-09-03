@@ -8,6 +8,14 @@ on:
   schedule:
     - cron: '17 12 1-7 * *'
   workflow_dispatch:
+    inputs:
+      force_publish:
+        description: >-
+          Commit and publish even when the workbook is unchanged. Exercises the
+          commit/push/deploy path on demand instead of waiting for a real
+          vintage; costs one commit carrying nothing but rebuild timestamps.
+        type: boolean
+        default: false
 
 # contents: write to commit the new vintage; pages/id-token to publish it.
 # Publishing from this run rather than leaving it to pages.yml is deliberate:
@@ -29,6 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       changed: ${{ steps.check.outputs.changed }}
+      publish: ${{ steps.check.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
 
@@ -85,26 +94,34 @@ jobs:
           except subprocess.CalledProcessError:
               old = None
           changed = new != old
-          print(f"previous {old}\ncurrent  {new}\nchanged  {changed}")
+          forced = os.environ.get("FORCE_PUBLISH") == "true"
+          publish = changed or forced
+          print(f"previous {old}\ncurrent  {new}\n"
+                f"changed  {changed}\nforced   {forced}")
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"changed={'true' if changed else 'false'}\n")
+              f.write(f"publish={'true' if publish else 'false'}\n")
           with open("web/data/gpr.json") as f:
               f2 = json.load(f)
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
-              f.write(f"GPR data through **{f2['months'][-1]}** — "
-                      f"{'new vintage, publishing' if changed else 'unchanged, nothing to publish'}\n")
+              state = ("new vintage, publishing" if changed else
+                       "unchanged, forced publish" if forced else
+                       "unchanged, nothing to publish")
+              f.write(f"GPR data through **{f2['months'][-1]}** — {state}\n")
           PY
+        env:
+          FORCE_PUBLISH: ${{ inputs.force_publish }}
 
       # Run the repository's own invariants against the vintage about to be
       # published, before it is committed. Failing here leaves main untouched
       # and the live site on the previous vintage, which is the safe direction:
       # a month of stale data beats a month of wrong data.
       - name: Verify the new vintage
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.publish == 'true'
         run: python3 .claude/skills/ribat-verify/verify.py
 
       - name: Commit and publish
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.publish == 'true'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -119,16 +136,32 @@ jobs:
                      web/data/validation.json \
                      data/processed/validation_report.txt README.md
           MONTH=$(python3 -c "import json;print(json.load(open('web/data/gpr.json'))['months'][-1])")
-          git commit -m "Data refresh: GPR through ${MONTH}
+
+          # A forced run must not leave history claiming a vintage arrived when
+          # none did. It also has nothing to say beyond rebuild timestamps, so
+          # when the staged tree is identical there is nothing to commit and the
+          # run proceeds straight to republishing the unchanged site.
+          if [ "${{ steps.check.outputs.changed }}" = "true" ]; then
+            git commit -m "Data refresh: GPR through ${MONTH}
 
           Automated monthly rebuild. Latest months are preliminary and subject
           to revision as delayed newspaper editions enter the search database."
-          git push
+            git push
+          elif git diff --cached --quiet; then
+            echo "Forced run: staged tree is identical, nothing to commit."
+          else
+            git commit -m "Rebuild timestamps: GPR still through ${MONTH}
+
+          Forced run with no new vintage. The data is unchanged; this carries
+          only the timestamps a rebuild rewrites, and exists to exercise the
+          commit and publish path on demand."
+            git push
+          fi
 
       # Upload from this workspace, not from a fresh checkout: these are the
       # exact files the checks above just passed on.
       - uses: actions/upload-pages-artifact@v3
-        if: steps.check.outputs.changed == 'true'
+        if: steps.check.outputs.publish == 'true'
         with:
           path: web
 
@@ -137,7 +170,7 @@ jobs:
   # is most of them.
   deploy:
     needs: refresh
-    if: needs.refresh.outputs.changed == 'true'
+    if: needs.refresh.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       pages: write
