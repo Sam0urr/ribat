@@ -427,6 +427,21 @@ def main() -> int:
               "both expandable blocks use .%s, and it is defined in the stylesheet" % cls)
     check("sankey-wrap" not in html and "sankey-expand" not in html,
           "no stale pre-rename expand classes remain")
+
+    # The three pages must all reach each other. index.html was the only one
+    # that could not reach the method page: story and method both linked it,
+    # index did not, so a reader who never opened the story had no route to the
+    # methodology from the map at all.
+    pages = {"index": html}
+    for name in ("story", "method"):
+        fp = ROOT / "web" / (name + ".html")
+        if fp.exists():
+            pages[name] = fp.read_text(encoding="utf-8")
+    for src, body in pages.items():
+        for dst in pages:
+            if dst == src: continue
+            check(('href="./%s.html"' % dst) in body or ('href="%s.html"' % dst) in body,
+                  "%s.html links to %s.html" % (src, dst))
     check("<th class=\"nm\" scope=\"row\"" in html and 'scope="col"' in html,
           "expanded source list is a real table with row and column headers")
     check("Chokepoint, unattributable" in html and "tfoot" in html,
