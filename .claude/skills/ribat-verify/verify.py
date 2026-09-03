@@ -410,6 +410,19 @@ def main() -> int:
           "one dialog shell serves both expanded views")
     check('id="sourcesPanel"' in html and "sourcesTableHTML(" in html,
           "source-country list expands to a full-window table")
+    # Both expandable blocks must carry the SAME classes as the stylesheet
+    # defines. Renaming .sankey-wrap/.sankey-expand to the shared
+    # .expandable/.expand-badge was done with a dotted string replace, which
+    # matched the CSS selectors and missed the undotted class="..." the script
+    # emits: the Sankey's wrapper and badge shipped with no styling at all and
+    # nothing caught it. A class emitted but never defined is invisible to
+    # node --check and to every other check here.
+    for cls in ("expandable", "expand-badge"):
+        used = html.count('class="%s"' % cls)
+        check(used == 2 and (".%s{" % cls) in html.replace(" ", ""),
+              "both expandable blocks use .%s, and it is defined in the stylesheet" % cls)
+    check("sankey-wrap" not in html and "sankey-expand" not in html,
+          "no stale pre-rename expand classes remain")
     check("<th class=\"nm\" scope=\"row\"" in html and 'scope="col"' in html,
           "expanded source list is a real table with row and column headers")
     check("Chokepoint, unattributable" in html and "tfoot" in html,

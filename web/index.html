@@ -1411,9 +1411,9 @@ function sankeySVG(iso) {
   // anyone trying to reach the controls underneath. The dialog gets a skip link;
   // so does the panel.
   return `<a class="skiplink" href="#sankeyPanelEnd">Skip the routing diagram</a>`
-    + `<div class="sankey-wrap" id="sankeyPanel" role="button" tabindex="0"`
+    + `<div class="expandable" id="sankeyPanel" role="button" tabindex="0"`
        + ` aria-label="Expand the source routing diagram to full window, showing all ${m.allSources} sources individually">${r.svg}`
-       + `<span class="sankey-expand" aria-hidden="true">Expand ⤢</span></div>`
+       + `<span class="expand-badge" aria-hidden="true">Expand ⤢</span></div>`
     + `<div class="stack-key sankey-key">${r.key}</div>`
     + `<p class="cap sankey-cap" id="sankeyPanelEnd" tabindex="-1">${r.cap}</p>`;
 }
