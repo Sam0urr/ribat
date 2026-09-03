@@ -195,6 +195,13 @@ def main() -> int:
     ]
     tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
                              text=True).stdout.split()
+    # Scope is deliberately .py/.md/.html/.yml/.json/.csv and not .js or .css:
+    # the vendored MapLibre build under web/vendor/ is a faithful fork of
+    # Mapbox GL and legitimately mentions mapbox:// URL handling and the
+    # upstream issue tracker, so scanning it would flag the fork for being a
+    # fork. The pages themselves (.html) are scanned, which is where a Mapbox
+    # GL tag would reappear; the vendored-assets section below pins the
+    # library bytes by hash instead.
     scan = [t for t in tracked if t.endswith((".py", ".md", ".html", ".yml", ".json", ".csv"))
             and not t.startswith("web/data/countries-50m")
             # the verifier, its doc, and CLAUDE.md define/prohibit the banned
@@ -219,6 +226,73 @@ def main() -> int:
         f = ROOT / fname
         ok = f.exists() and "Caldara" in f.read_text(encoding="utf-8")
         check(ok, f"{fname} present with Caldara-Iacoviello attribution")
+
+    # 6b ── vendored assets --------------------------------------------------
+    # Invariant 1 promises zero third-party requests at runtime. That holds
+    # only while every library and font file the pages load is served from
+    # web/vendor/ and is the file MANIFEST.json says it is, so the manifest is
+    # checked byte-for-byte here and both pages are scanned for anything that
+    # would leave the origin. A hash mismatch is a silent upgrade (or a
+    # tampered file), not noise: fix the manifest entry deliberately.
+    section("vendored assets")
+    vendor = ROOT / "web" / "vendor"
+    manifest_path = vendor / "MANIFEST.json"
+    listed: set[str] = set()
+    licence_files: set[str] = set()
+    if not manifest_path.exists():
+        check(False, "web/vendor/MANIFEST.json exists")
+    else:
+        try:
+            entries = json.loads(manifest_path.read_text(encoding="utf-8"))["files"]
+        except Exception as e:  # malformed manifest is a failure, not a crash
+            entries = []
+            check(False, f"web/vendor/MANIFEST.json parses and carries 'files': {e}")
+        check(bool(entries), "MANIFEST.json lists at least one file")
+        for entry in entries:
+            rel = str(entry.get("path", ""))
+            listed.add(rel)
+            missing = [k for k in ("path", "source_url", "version", "bytes", "sha256",
+                                   "licence", "fetched") if k not in entry]
+            if missing:
+                check(False, f"{rel}: manifest entry lacks {', '.join(missing)}")
+            f = ROOT / rel
+            if not rel.startswith("web/vendor/") or not f.is_file():
+                check(False, f"{rel}: listed in manifest but not a file under web/vendor/")
+                continue
+            data = f.read_bytes()
+            ok = len(data) == entry.get("bytes") and \
+                hashlib.sha256(data).hexdigest() == entry.get("sha256")
+            check(ok, f"{rel}: {len(data)} bytes, sha256 "
+                      + ("matches manifest" if ok else "or byte count differs from manifest"))
+            lf = entry.get("licence_file")
+            licence_files.update([lf] if isinstance(lf, str) else (lf or []))
+        # (d) every licence file the manifest names is actually shipped
+        check(bool(licence_files), "manifest names the licence file of each package")
+        for lf in sorted(licence_files):
+            check((ROOT / lf).is_file(), f"licence file {lf} present")
+        # (c) nothing under web/vendor/ escapes the manifest (the manifest
+        # cannot hash itself and is the one exemption)
+        on_disk = {p.relative_to(ROOT).as_posix() for p in vendor.rglob("*")
+                   if p.is_file() and p.name not in ("MANIFEST.json", ".DS_Store")}
+        stray = sorted(on_disk - listed)
+        check(not stray, "every file under web/vendor/ is listed in MANIFEST.json"
+              + ("" if not stray else " -> " + ", ".join(stray[:5])))
+    # (b) neither page reaches a third party: tags, preconnects, CSS imports,
+    # url() and fetch() must all be same-origin. data: URIs are not requests.
+    leak = [
+        (re.compile(r"<script[^>]*\ssrc\s*=\s*[\"']?\s*https?://", re.I), "script src"),
+        (re.compile(r"<link[^>]*\shref\s*=\s*[\"']?\s*https?://", re.I), "link href"),
+        (re.compile(r"<link[^>]*\srel\s*=\s*[\"']?\s*(preconnect|dns-prefetch)", re.I), "preconnect"),
+        (re.compile(r"@import\s+(url\()?\s*[\"']?\s*https?://", re.I), "@import"),
+        (re.compile(r"url\(\s*[\"']?\s*https?://", re.I), "url()"),
+        (re.compile(r"fetch\(\s*[\"'`]https?://"), "fetch()"),
+    ]
+    for page in ("index.html", "story.html"):
+        text = (ROOT / "web" / page).read_text(encoding="utf-8")
+        found = [label for rx, label in leak if rx.search(text)]
+        check(not found, f"web/{page}: no third-party script, stylesheet, preconnect, "
+                         "@import, url() or fetch()"
+              + ("" if not found else " -> " + ", ".join(found)))
 
     # 7 ── export contract ---------------------------------------------------
     # A downloaded CSV leaves the interface and loses every caveat the panels
