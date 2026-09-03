@@ -53,7 +53,7 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: pip install --quiet pandas numpy scipy xlrd openpyxl
+        run: pip install --quiet -r requirements.txt
 
       - name: Download GPR workbook
         run: |

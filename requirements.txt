@@ -1,0 +1,15 @@
+# Pinned so a rebuild is reproducible. The published series are rounded to the
+# last decimal they display, so a library that changes a summation strategy can
+# move the numbers under you and read as a data revision — the monthly refresh
+# has no way to tell the two apart.
+#
+# These are the versions that built the committed payloads. Python 3.11, matching
+# .github/workflows/*.yml. Bump deliberately, then rebuild and inspect the diff.
+pandas==2.1.4
+numpy==1.26.4
+scipy==1.11.4
+# The workbook is legacy OLE2 (CDFV2 Microsoft Excel), which openpyxl cannot
+# read; xlrd is required, not optional. openpyxl covers the .xlsx the site has
+# occasionally served under the same name.
+xlrd==2.0.2
+openpyxl==3.0.10
