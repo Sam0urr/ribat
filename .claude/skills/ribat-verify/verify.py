@@ -399,8 +399,23 @@ def main() -> int:
     # the pooled tail, and it must carry the same disclosures as the panel.
     check('id="sankeyModal"' in html and 'aria-modal="true"' in html,
           "expanded routing view is a real dialog")
-    check("function closeSankeyModal(" in html and "'Escape'" in html,
+    check("function closeModal(" in html and "'Escape'" in html,
           "expanded view closes on Escape")
+
+    # The expanded source table opens the pooled tail the panel can only assert.
+    # One dialog serves both it and the Sankey: a second would mean a second
+    # focus trap and a second Escape handler racing the first.
+    check("function openSourcesModal(" in html and "function openSankeyModal(" in html
+          and "function openModal(" in html,
+          "one dialog shell serves both expanded views")
+    check('id="sourcesPanel"' in html and "sourcesTableHTML(" in html,
+          "source-country list expands to a full-window table")
+    check("<th class=\"nm\" scope=\"row\"" in html and 'scope="col"' in html,
+          "expanded source list is a real table with row and column headers")
+    check("Chokepoint, unattributable" in html and "tfoot" in html,
+          "expanded source table foots to attributed + chokepoint")
+    check("sankeyPct(r.share * 100)" in html,
+          "source shares use adaptive precision, so the ranked column still sums")
     check("SANKEY_GEOM" in html and "pool: 0" in html,
           "expanded view un-pools: every source country is drawn individually")
     check("skReturnFocus" in html, "expanded view restores focus on close")

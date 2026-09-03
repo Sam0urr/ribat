@@ -104,12 +104,12 @@
      palette (invariant 5): the ramp keeps meaning what it means and the
      highlight is a change in emphasis, not in category. */
   .sankey{width:100%;height:auto;display:block;margin:2px 0 3px}
-  .sankey-wrap{position:relative;cursor:zoom-in;border-radius:4px}
-  .sankey-wrap:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .sankey-expand{position:absolute;top:2px;right:2px;font-size:8.5px;color:var(--muted);
+  .expandable{position:relative;cursor:zoom-in;border-radius:4px}
+  .expandable:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .expand-badge{position:absolute;top:2px;right:2px;font-size:8.5px;color:var(--muted);
     background:rgba(13,17,23,.75);border:1px solid var(--line);border-radius:4px;
     padding:1px 4px;pointer-events:none;letter-spacing:.03em}
-  .sankey-wrap:hover .sankey-expand{color:var(--accent);border-color:var(--accent)}
+  .expandable:hover .expand-badge{color:var(--accent);border-color:var(--accent)}
   svg.sankey .sk-band,svg.sankey .sk-conv,svg.sankey .sk-bar,svg.sankey .sk-lead,svg.sankey text{
     transition:opacity .12s linear}
   @media (prefers-reduced-motion:reduce){
@@ -135,6 +135,45 @@
     outline:2px solid var(--accent);outline-offset:1px}
   svg.sk-live .sk-node:focus-visible .sk-bar{stroke:var(--ink);stroke-width:1}
 
+
+  /* Expanded source-country table. A real table, not a grid of divs: 43 ranked
+     rows with per-channel columns is exactly what table semantics are for, and
+     a screen reader then gets row/column context for free rather than needing
+     it rebuilt out of aria attributes. */
+  #skBody > .srctable{flex:1 1 auto;width:100%}
+  table.srcfull{width:100%;border-collapse:collapse;font-size:12px}
+  table.srcfull caption{text-align:left;font-size:11px;color:var(--muted);
+    padding:0 0 8px;line-height:1.45}
+  table.srcfull th,table.srcfull td{padding:4px 8px;text-align:right;white-space:nowrap}
+  /* Column headers only. Scoped to thead because the row headers are country
+     names, and uppercasing and muting those made the table's subject the least
+     readable thing in it. */
+  table.srcfull thead th{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;
+    color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--panel);z-index:2}
+  table.srcfull tbody th{font-weight:400;color:var(--ink)}
+  table.srcfull td.nm,table.srcfull th.nm{text-align:left;white-space:normal}
+  table.srcfull td.rk,table.srcfull th.rk{text-align:right;color:var(--muted);
+    font-family:var(--mono);font-size:10.5px;width:34px}
+  table.srcfull td.num{font-family:var(--mono)}
+  table.srcfull tbody tr:nth-child(even){background:rgba(255,255,255,.017)}
+  table.srcfull tbody tr.idle td,table.srcfull tbody tr.idle th{color:var(--muted);opacity:.7}
+  table.srcfull tbody tr:hover{background:rgba(88,166,255,.09)}
+  table.srcfull td.barcell{width:26%;padding-right:14px}
+  table.srcfull .bar{display:block;height:9px;background:#0d1117;
+    border:1px solid var(--line);border-radius:2px;overflow:hidden}
+  table.srcfull .bar i{display:block;height:100%}
+  /* The sum is the reason the table has a foot; scrolling it out of sight while
+     43 rows go past defeats the point. */
+  table.srcfull tfoot{position:sticky;bottom:0;z-index:2}
+  table.srcfull tfoot td,table.srcfull tfoot th{border-top:1px solid var(--line);
+    padding-top:7px;font-weight:600;background:var(--panel)}
+  table.srcfull tfoot tr.resid td,table.srcfull tfoot tr.resid th{color:var(--warn);font-weight:400}
+  table.srcfull tfoot tr.tot td,table.srcfull tfoot tr.tot th{border-top:1px solid var(--line)}
+  @media (max-width:900px){
+    #skBody > .srctable{min-width:640px}
+    table.srcfull td.barcell,table.srcfull th.barcell{display:none}
+  }
   #sankeyTip{position:fixed;z-index:60;max-width:330px;pointer-events:none;
     background:rgba(13,17,23,.97);border:1px solid var(--line);border-radius:6px;
     padding:7px 9px;font-size:11px;line-height:1.45;color:var(--ink);
@@ -210,11 +249,19 @@
     </div>
     <div class="modal-body" id="skBody"></div>
     <div class="modal-foot" id="skFoot" tabindex="-1">
-      <div class="stack-key" id="skKey"></div>
-      <div class="lockrow">
-        <span id="skLock">Hover or focus a band to trace it. Tap to lock on a touch screen.</span>
-        <button type="button" id="skClear" hidden>Clear highlight</button>
-        <button type="button" class="chartdl" data-chart="sankey" data-root="modal">Download SVG</button>
+      <div id="skFootSankey">
+        <div class="stack-key" id="skKey"></div>
+        <div class="lockrow">
+          <span id="skLock">Hover or focus a band to trace it. Tap to lock on a touch screen.</span>
+          <button type="button" id="skClear" hidden>Clear highlight</button>
+          <button type="button" class="chartdl" data-chart="sankey" data-root="modal">Download SVG</button>
+        </div>
+      </div>
+      <div id="skFootSources" hidden>
+        <div class="lockrow">
+          <span id="skSrcNote"></span>
+          <button type="button" class="chartdl" id="skSrcDl">Download all sources</button>
+        </div>
       </div>
       <p class="cap" id="skCap"></p>
     </div>
@@ -860,7 +907,7 @@ function render() {
   // here is what keeps an open expanded view from showing a month the rest of
   // the page has already moved on from.
   if (typeof sankeyModalOpen === 'function' && sankeyModalOpen()) {
-    if (!fillSankeyModal()) closeSankeyModal();
+    if (!fillModal()) closeModal();
   }
   if (!world) return;
   // One value function for both views. In the reverse view the selected economy
@@ -1524,6 +1571,7 @@ document.addEventListener('focusout', e => {
    way with a mouse and another with a finger. Locking lives in the expanded
    view, where there is room to read what has been locked. */
 document.addEventListener('click', e => {
+  if (e.target instanceof Element && e.target.closest('#sourcesPanel')) { openSourcesModal(); return; }
   const wrap = e.target instanceof Element ? e.target.closest('#sankeyPanel') : null;
   if (wrap) { e.preventDefault(); openSankeyModal(); return; }
   const el = sankeyTarget(e);
@@ -1537,6 +1585,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.target instanceof Element && e.target.closest('#sourcesPanel')) { e.preventDefault(); openSourcesModal(); return; }
   const wrap = e.target instanceof Element ? e.target.closest('#sankeyPanel') : null;
   if (wrap) { e.preventDefault(); openSankeyModal(); return; }
   const el = sankeyTarget(e);
@@ -1550,7 +1599,114 @@ document.addEventListener('keydown', e => {
 // --- expanded view -------------------------------------------------------
 const SK_INERT = ['map', 'left', 'detail', 'banner'];
 
+/* One dialog, two contents. A second dialog would mean a second focus trap and
+   a second Escape handler racing the first; the shell is identical either way,
+   so only what fills it varies. */
+let skMode = 'sankey';                       // 'sankey' | 'sources'
+const SK_RETURN = { sankey: 'sankeyPanel', sources: 'sourcesPanel' };
+
 function sankeyModalOpen() { const m = document.getElementById('sankeyModal'); return m && !m.hidden; }
+
+function fillModal() {
+  return skMode === 'sources' ? fillSourcesModal() : fillSankeyModal();
+}
+
+/* The expanded source-country list. The panel ranks the top 15 and states a
+   residue ("+ 28 smaller sources"); this is where that residue is opened up.
+
+   A table rather than a taller stack of the panel's bar rows: at full width
+   there is room for the columns the panel cannot fit - the contribution in
+   index points, and the per-channel split that says *how* a source reaches this
+   economy - and table semantics give a screen reader row and column context
+   without any of it being rebuilt out of aria attributes.
+
+   The foot carries the sum. The panel asserts in prose that the shares add to
+   the attributed share and that the chokepoint residual makes up the rest;
+   here the reader can see it add up, which is a different and better kind of
+   claim. Per-channel figures use the Sankey's adaptive precision for the same
+   reason they do there: at a fixed two decimals the smallest of 43 sources
+   round to 0.00% and the column visibly stops adding up. */
+function sourcesTableHTML(iso, a) {
+  const chans = [[state.basis, SANKEY_CHAN_LBL[state.basis]], ['energy', 'Energy'], ['crm', 'Raw mat.']]
+    .filter(([ch]) => a.rows.some(r => r.ch[ch]));
+  // A source can hold dependency weight and still contribute exactly nothing,
+  // because its own GPR was zero that month. The routing diagram cannot show
+  // those - a zero-width band is not drawable, so it omits them - but a table
+  // can, and the difference between the two counts is worth stating rather than
+  // leaving a reader to notice it and doubt both.
+  const idle = a.rows.filter(r => !(r.total > 0));
+  const num = v => state.mode === 'rebased' ? v.toFixed(2) : v.toFixed(4);
+  const top = a.rows[0] ? a.rows[0].share : 0;
+
+  const head = '<tr><th class="rk" scope="col">#</th><th class="nm" scope="col">Source country</th>'
+    + '<th class="barcell" scope="col"><span class="sr-only">Relative size</span></th>'
+    + '<th scope="col">Share of Intensity</th>'
+    + '<th scope="col">Contribution (' + sankeyUnit() + ')</th>'
+    + chans.map(([, lbl]) => '<th scope="col">' + xesc(lbl) + '</th>').join('')
+    + '</tr>';
+
+  const body = a.rows.map((r, i) =>
+    '<tr' + (r.total > 0 ? '' : ' class="idle"') + '><td class="rk">' + (i + 1) + '</td>'
+    + '<th class="nm" scope="row">' + xesc(NAMES[r.iso] || r.iso) + '</th>'
+    + '<td class="barcell"><span class="bar"><i style="width:'
+      + Math.max(1, Math.min(100, top ? r.share / top * 100 : 0)).toFixed(1)
+      + '%;background:' + colourFor(bucket(r.share, null)) + '"></i></span></td>'
+    + '<td class="num">' + sankeyPct(r.share * 100) + '%</td>'
+    + '<td class="num">' + num(r.total) + '</td>'
+    + chans.map(([ch]) => '<td class="num">' + (r.ch[ch] ? sankeyPct(r.ch[ch] / a.total * 100) + '%' : '—') + '</td>').join('')
+    + '</tr>').join('');
+
+  const span = 3;   // rank + name + bar, before the numeric columns
+  const footRow = (cls, label, share, val, warn) =>
+    '<tr class="' + cls + '"><td colspan="' + span + '"' + (warn ? ' style="color:var(--warn)"' : '')
+    + '>' + xesc(label) + '</td>'
+    + '<td class="num">' + share + '</td><td class="num">' + val + '</td>'
+    + '<td colspan="' + chans.length + '"></td></tr>';
+
+  const foot = footRow('', 'Attributed to source countries', (a.attributedShare * 100).toFixed(1) + '%', num(a.attributed))
+    + footRow('resid', 'Chokepoint, unattributable — weights a strait, not a country', (a.residualShare * 100).toFixed(1) + '%', num(a.residual), true)
+    + footRow('tot', (NAMES[iso] || iso) + ' Intensity', ((a.attributedShare + a.residualShare) * 100).toFixed(1) + '%', num(a.total));
+
+  const cap = 'All ' + a.rows.length + ' GPR source countries that carry weight for '
+    + (NAMES[iso] || iso) + ' at ' + state.months[state.idx]
+    + ', ranked by contribution, under the channel mix on screen. Shares are of this economy’s Intensity'
+    + (state.covnorm ? ' per observed dependency' : '')
+    + ', not of the attributed part, so the column sums to the attributed share and the chokepoint '
+    + 'residual makes up the rest. Small shares are shown to more decimal places so the column still adds up.'
+    + ' Each figure is rounded on its own, so the last digit of a column may not'
+    + ' add to the displayed total; the underlying values reconcile exactly, and the'
+    + ' download carries them to six decimal places.'
+    + (idle.length
+        ? ' ' + idle.length + ' of them (' + idle.map(r => NAMES[r.iso] || r.iso).join(', ')
+          + ') carry dependency weight but recorded no geopolitical risk this month, so they contribute'
+          + ' exactly nothing; the routing diagram omits them because a zero-width band cannot be drawn.'
+        : '');
+
+  return '<div class="srctable"><table class="srcfull"><caption>' + xesc(cap) + '</caption>'
+    + '<thead>' + head + '</thead><tbody>' + body + '</tbody><tfoot>' + foot + '</tfoot></table></div>';
+}
+
+function fillSourcesModal() {
+  const iso = state.selected;
+  const a = iso ? currentAttribution() : null;
+  if (!a || !a.rows.length) return false;
+  document.getElementById('skTitle').textContent = (NAMES[iso] || iso) + ' — source countries';
+  const idleN = a.rows.filter(r => !(r.total > 0)).length;
+  document.getElementById('skSub').textContent = iso + ' · ' + state.months[state.idx]
+    + ' · ' + state.mode + ' · all ' + a.rows.length + ' sources, ranked'
+    + (idleN ? ' · ' + (a.rows.length - idleN) + ' contributing' : '');
+  document.getElementById('skBody').innerHTML = sourcesTableHTML(iso, a);
+  document.getElementById('skSrcNote').textContent =
+    'Ranked by contribution. The download carries the same ' + a.rows.length + ' rows.';
+  document.getElementById('skCap').innerHTML =
+    vintageCaptionHTML(a.year, state.months[state.idx])
+    + selfExcludedCaptionHTML(iso)
+    + (state.data.stale_weights && state.data.stale_weights[iso]
+        ? '<p class="cap" style="color:var(--warn)">Stopped reporting to Comtrade after '
+          + state.data.stale_weights[iso] + '; weights carried forward from that year and increasingly unrepresentative.</p>'
+        : '');
+  return true;
+}
 
 function fillSankeyModal() {
   const iso = state.selected;
@@ -1568,18 +1724,28 @@ function fillSankeyModal() {
   return true;
 }
 
-function openSankeyModal() {
-  if (!fillSankeyModal()) return;
+function openModal(mode) {
+  const prev = skMode;
+  skMode = mode;
+  if (!fillModal()) { skMode = prev; return; }
+  // Only the footer controls that belong to this mode: the highlight lock and
+  // the channel key mean nothing over a table.
+  document.getElementById('skFootSankey').hidden = mode !== 'sankey';
+  document.getElementById('skFootSources').hidden = mode !== 'sources';
   skReturnFocus = document.activeElement;
   const modal = document.getElementById('sankeyModal');
   modal.hidden = false;
   for (const id of SK_INERT) { const el = document.getElementById(id); if (el) { el.inert = true; el.setAttribute('aria-hidden', 'true'); } }
   document.getElementById('skClose').focus();
-  document.getElementById('liveRegion').textContent =
-    'Expanded routing view opened. All source countries shown individually. Press Escape to close.';
+  document.getElementById('liveRegion').textContent = mode === 'sources'
+    ? 'Expanded source-country table opened, all sources ranked. Press Escape to close.'
+    : 'Expanded routing view opened. All source countries shown individually. Press Escape to close.';
 }
 
-function closeSankeyModal() {
+function openSankeyModal() { openModal('sankey'); }
+function openSourcesModal() { openModal('sources'); }
+
+function closeModal() {
   const modal = document.getElementById('sankeyModal');
   if (!modal || modal.hidden) return;
   skLock = null;
@@ -1587,13 +1753,18 @@ function closeSankeyModal() {
   modal.hidden = true;
   document.getElementById('skBody').innerHTML = '';
   for (const id of SK_INERT) { const el = document.getElementById(id); if (el) { el.inert = false; el.removeAttribute('aria-hidden'); } }
-  const back = skReturnFocus && document.contains(skReturnFocus)
-    ? skReturnFocus : document.getElementById('sankeyPanel');
+  // Opened by mouse, the element focused beforehand is usually <body>, which is
+  // not focusable - focus() on it is a no-op and focus stays stranded on the
+  // close button inside the subtree just hidden. Fall back to the panel control
+  // that opens this mode, so a Tab after closing carries on from the right place.
+  const prev = skReturnFocus;
+  const back = (prev && prev !== document.body && prev.tabIndex >= 0 && document.contains(prev))
+    ? prev : document.getElementById(SK_RETURN[skMode] || 'sankeyPanel');
   if (back && back.focus) back.focus();
   skReturnFocus = null;
 }
 
-document.getElementById('skClose').addEventListener('click', closeSankeyModal);
+document.getElementById('skClose').addEventListener('click', closeModal);
 document.getElementById('skClear').addEventListener('click', () => {
   const svg = document.querySelector('#skBody svg.sk-live');
   sankeySetLock(svg, null);
@@ -1602,7 +1773,7 @@ document.getElementById('skClear').addEventListener('click', () => {
 // Click outside the card closes. The card stops the event so a click inside it
 // - including one that lands between bands - never closes the dialog.
 document.getElementById('sankeyModal').addEventListener('click', e => {
-  if (e.target === document.getElementById('sankeyModal')) closeSankeyModal();
+  if (e.target === document.getElementById('sankeyModal')) closeModal();
 });
 
 /* Focus trap. Cycles within the card so Tab cannot reach the map behind it;
@@ -1610,7 +1781,7 @@ document.getElementById('sankeyModal').addEventListener('click', e => {
    this keeps the loop honest in browsers that ship one but not the other. */
 document.addEventListener('keydown', e => {
   if (!sankeyModalOpen()) return;
-  if (e.key === 'Escape') { e.preventDefault(); closeSankeyModal(); return; }
+  if (e.key === 'Escape') { e.preventDefault(); closeModal(); return; }
   if (e.key !== 'Tab') return;
   const card = document.getElementById('skCard');
   const f = Array.from(card.querySelectorAll('a[href], button:not([disabled]), [tabindex]'))
@@ -1625,6 +1796,9 @@ document.getElementById('skFoot').addEventListener('click', e => {
   const b = e.target.closest('[data-chart]');
   if (b) exportChart(b.dataset.chart, b.dataset.root);
 });
+// Reuses the panel's own source download rather than building a second one, so
+// the table on screen and the file on disk cannot describe different rows.
+document.getElementById('skSrcDl').addEventListener('click', () => doExport('sources'));
 
 /* Reverse-view panel. Deliberately not a variant of the exposure panel: it
    answers a different question, in different units, and the number that must
@@ -1661,8 +1835,13 @@ function detailSources(iso) {
     ${sankeyHTML ? `<h2 style="margin-top:14px">Routing</h2>` + sankeyHTML
         + `<div class="chartdl-row"><button class="chartdl" type="button" data-chart="sankey">Download SVG</button></div>` : ''}
     <h2 style="margin-top:14px">Source countries</h2>
-    ${shown.map(bar).join('')}
-    ${rest > 0 ? `<p class="cap">+ ${rest} smaller sources, ${(restSum * 100).toFixed(1)}% between them. The risk-sources download carries all ${a.rows.length}.</p>` : ''}
+    <a class="skiplink" href="#sourcesPanelEnd">Skip the source list</a>
+    <div class="expandable" id="sourcesPanel" role="button" tabindex="0"
+         aria-label="Expand the source country list to full window, showing all ${a.rows.length} sources ranked, with their contributions and channel split">
+      ${shown.map(bar).join('')}
+      <span class="expand-badge" aria-hidden="true">Expand ⤢</span>
+    </div>
+    ${rest > 0 ? `<p class="cap" id="sourcesPanelEnd" tabindex="-1">+ ${rest} smaller sources, ${(restSum * 100).toFixed(1)}% between them. Expand the list to see all ${a.rows.length} individually; the risk-sources download carries the same rows.</p>` : `<p class="cap" id="sourcesPanelEnd" tabindex="-1">All ${a.rows.length} sources are listed. Expand for their contributions and channel split.</p>`}
     <p class="cap" style="margin-top:12px">Shares are of this economy’s Intensity${state.covnorm ? ' per observed dependency (each channel divided by its covered share; chokepoint unchanged)' : ''}, not of the attributed part, so they sum to ${(a.attributedShare * 100).toFixed(1)}% and the chokepoint residual makes up the rest. Chokepoint transit weights a strait rather than a country and cannot be traced to a source (METHODOLOGY.md 3.4).</p>
     ${selfExcludedCaptionHTML(iso)}
     ${vintageCaptionHTML(a.year, state.months[state.idx])}
