@@ -216,7 +216,7 @@ def carry_forward(w: pd.DataFrame, years: list[int]) -> tuple[pd.DataFrame, dict
     return pd.concat(blocks, ignore_index=True), stale
 
 
-def load_gpr() -> pd.DataFrame:
+def load_gpr() -> tuple[pd.DataFrame, str]:
     """Load the monthly country GPR panel from the freshest pinned source.
 
     data/raw and data/processed are both gitignored and the refresh runs in CI,
@@ -233,7 +233,10 @@ def load_gpr() -> pd.DataFrame:
     today's numbers, not a past commit's.
 
     The processed CSV wins when it is at least as current; otherwise gpr.json
-    does, and says so.
+    does, and says so. gpr.json is rounded at write time, though, so the fallback
+    reproduces a commit's payload only to the published precision; the second
+    return value names the source so guard_no_regression can refuse to publish a
+    rounded rebuild over a full-precision one.
     """
     csv_path, json_path = PROC / "gpr_country_monthly.csv", WEB / "gpr.json"
 
@@ -266,11 +269,11 @@ def load_gpr() -> pd.DataFrame:
     lc, lj = last(csv_df), last(json_df)
     if csv_df is not None and (lj is None or lc >= lj):
         print(f"GPR source: {csv_path.name} (through {str(lc)[:7]})")
-        return csv_df
+        return csv_df, "processed_csv"
     if json_df is not None:
         why = "no processed CSV" if csv_df is None else f"CSV only reaches {str(lc)[:7]}"
         print(f"GPR source: web/data/gpr.json (through {str(lj)[:7]}) — {why}")
-        return json_df
+        return json_df, "tracked_gpr_json"
     raise SystemExit(
         "No GPR panel found. Expected data/processed/gpr_country_monthly.csv "
         "(run 01_load_gpr.py against the workbook) or the tracked web/data/gpr.json."
@@ -308,11 +311,21 @@ def guard_no_regression(payload: dict, out: Path) -> list[str]:
     missing = ochs - nchs
     if missing:
         bad.append("channels disappear: " + ", ".join(sorted(missing)))
+    # Precision regression. web/data/gpr.json is rounded when written (4dp on
+    # level, 2dp on rebased), so rebuilding the payload from it rather than from
+    # the full-precision CSV moves every value by up to one unit in the last
+    # published place. Nothing else catches this: the refresh job's change
+    # detector hashes gpr.json, which is identical either way.
+    osrc, nsrc = old.get("gpr_source"), payload.get("gpr_source")
+    if osrc == "processed_csv" and nsrc == "tracked_gpr_json":
+        bad.append("GPR precision degrades: rebuilt from the rounded "
+                   "web/data/gpr.json rather than data/processed/"
+                   "gpr_country_monthly.csv (run 01_load_gpr.py first)")
     return bad
 
 
 def main() -> None:
-    gpr = load_gpr()
+    gpr, gpr_source = load_gpr()
     months = sorted(gpr["month"].unique())
 
     # ---- assemble long weight table: one row per (i, j, year, channel) -----
@@ -496,6 +509,9 @@ def main() -> None:
                   "littoral states excluding the exposed economy's own GPR; where "
                   "none remains the strait is dropped (choke_self_excluded).",
         "generated": pd.Timestamp.today().strftime("%Y-%m-%d"),
+        # Which GPR panel built this payload; guard_no_regression uses it to
+        # refuse a rounded rebuild over a full-precision one.
+        "gpr_source": gpr_source,
     }
     WEB.mkdir(parents=True, exist_ok=True)
     out = WEB / "intensity.json"
