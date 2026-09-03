@@ -192,6 +192,10 @@ def main() -> int:
         (re.compile(r"\bGRE\b"), "GRE (old index name)"),
         (re.compile(r"gre\.json|gre_monthly|03_build_gre"), "gre-era filename"),
         (re.compile(r"api\.mapbox\.com|mapbox-gl(?!-)"), "Mapbox GL dependency"),
+        # Contact runs through the issue forms; no personal mailbox is
+        # published anywhere in the repository (a project alias, if one is
+        # ever created, goes in .github/ISSUE_TEMPLATE/config.yml).
+        (re.compile(r"@(icloud|gmail|outlook|hotmail|yahoo|me)\.com", re.I), "personal mailbox"),
     ]
     tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
                              text=True).stdout.split()
@@ -287,7 +291,7 @@ def main() -> int:
         (re.compile(r"url\(\s*[\"']?\s*https?://", re.I), "url()"),
         (re.compile(r"fetch\(\s*[\"'`]https?://"), "fetch()"),
     ]
-    for page in ("index.html", "story.html"):
+    for page in ("index.html", "story.html", "method.html"):
         text = (ROOT / "web" / page).read_text(encoding="utf-8")
         found = [label for rx, label in leak if rx.search(text)]
         check(not found, f"web/{page}: no third-party script, stylesheet, preconnect, "
@@ -781,6 +785,49 @@ def main() -> int:
     else:
         WARN.append("intensity.json is not kind=intensity_multi - methods review checks skipped")
         print("  warn intensity.json is not intensity_multi - skipped")
+
+    # 14 ── method page ------------------------------------------------------
+    # web/method.html is METHODOLOGY.md typeset for readers who arrive from the
+    # map. It is generated (pipeline/05_render_method.py) and carries the
+    # sha256 of the source it was rendered from; a mismatch means the contract
+    # was edited and the page was not regenerated, which is drift, not noise.
+    section("method page")
+    method_p = ROOT / "web" / "method.html"
+    method_src = ROOT / "METHODOLOGY.md"
+    if not method_p.exists():
+        check(False, "web/method.html exists (run pipeline/05_render_method.py)")
+    else:
+        method = method_p.read_text(encoding="utf-8")
+        m = re.search(r'<meta name="ribat-source-sha256" content="([0-9a-f]{64})"', method)
+        src_sha = hashlib.sha256(method_src.read_bytes()).hexdigest()
+        check(m is not None and m.group(1) == src_sha,
+              "web/method.html was rendered from the current METHODOLOGY.md "
+              "(re-run pipeline/05_render_method.py)")
+        r = subprocess.run([sys.executable, str(ROOT / "pipeline" / "05_render_method.py"),
+                            "--check"], capture_output=True, text=True)
+        check(r.returncode == 0, "web/method.html is byte-identical to a fresh render")
+        # every numbered heading in the contract is reachable by anchor, so
+        # "§3.4" in an issue, the interface or the story resolves to something
+        heads = re.findall(r"^#{2,3}\s+(\d+)(?:\.(\d+))?\.?\s", method_src.read_text(encoding="utf-8"), re.M)
+        runins = re.findall(r"^\*\*(\d+)\.(\d+)\s", method_src.read_text(encoding="utf-8"), re.M)
+        want = {f"s{a}" + (f"-{b}" if b else "") for a, b in heads} | {f"s{a}-{b}" for a, b in runins}
+        missing = sorted(i for i in want if f'id="{i}"' not in method)
+        check(not missing, f"every numbered section has an anchor ({len(want)} ids)"
+              + ("" if not missing else " -> missing " + ", ".join(missing)))
+        check("<script" not in method, "method page carries no script: it is a document")
+        check('href="./vendor/fonts.css"' in method, "method page uses the vendored typefaces")
+        check("Caldara" in method, "method page carries the Caldara-Iacoviello attribution")
+        # the story links the local page, not the GitHub blob: a reader must
+        # not have to leave the site to find out what the map is doing
+        story_p = ROOT / "web" / "story.html"
+        story = story_p.read_text(encoding="utf-8") if story_p.exists() else ""
+        check('href="./method.html"' in story, "story.html links the local method page")
+        check("issues/new/choose" in story and "issues/new/choose" in method,
+              "story and method pages link the issue forms (the request channel)")
+        forms = ROOT / ".github" / "ISSUE_TEMPLATE"
+        for f in ("data-request.yml", "methodology-question.yml", "bug-or-data-issue.yml",
+                  "general-question.yml", "config.yml"):
+            check((forms / f).is_file(), f".github/ISSUE_TEMPLATE/{f} present")
 
     # ── result --------------------------------------------------------------
     print()

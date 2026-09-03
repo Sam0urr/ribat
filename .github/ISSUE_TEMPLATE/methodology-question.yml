@@ -1,0 +1,37 @@
+name: Methodology question
+description: Ask about index construction, a specific section of the methodology, or a modelling choice you think is wrong.
+title: "[Methodology] "
+labels: ["methodology", "question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Most modelling choices are documented on the
+        [methodology page](https://sam0urr.github.io/ribat/method.html)
+        (the typeset copy of `METHODOLOGY.md`): lagged weights (§5.3), the
+        pre-2020 anachronism (§5.7), coverage and the ranking confound (§5.4),
+        the chokepoint construction and its self-exclusion rule (§3.4), and the
+        channel-collinearity finding (§5.8). Check the section first; if it is
+        wrong or unclear, that is exactly what this form is for.
+  - type: input
+    id: section
+    attributes:
+      label: Relevant section (if any)
+      description: e.g. §3.4 (chokepoint), §5.3 (lagged weights), §5.4 (coverage)
+      placeholder: "§"
+    validations:
+      required: false
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What is unclear, or what do you think the methodology gets wrong? A pointer to a source or a worked example is welcome.
+    validations:
+      required: true
+  - type: input
+    id: contact
+    attributes:
+      label: Email (optional)
+      description: Only if you want a reply outside GitHub. Issues are public; leave blank if you would rather not post an address.
+    validations:
+      required: false

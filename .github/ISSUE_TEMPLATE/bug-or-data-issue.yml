@@ -1,0 +1,33 @@
+name: Bug or data issue
+description: Something in the map, an export, or a payload value looks wrong.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: Economy, month, and channel or view affected
+      placeholder: "e.g. SAU, 2023-10, chokepoint channel"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what you saw
+    validations:
+      required: true
+  - type: input
+    id: url
+    attributes:
+      label: Link to the state (optional)
+      description: The page URL, or a screenshot link, if it helps reproduce.
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Browser, export format, or the file header block if the problem is in a download.
+    validations:
+      required: false

@@ -1,0 +1,12 @@
+# Issue forms are the project's request and contact channel. They are public,
+# searchable, and need no server, which keeps the site's zero-third-party
+# invariant intact. No personal mailbox is published here or anywhere in the
+# repository; a project alias can be added as a contact_link when one exists.
+blank_issues_enabled: true
+contact_links:
+  - name: Read the methodology first
+    url: https://sam0urr.github.io/ribat/method.html
+    about: Index construction, channels, normalisation, known limitations and the export contract, typeset from METHODOLOGY.md.
+  - name: Open the map
+    url: https://sam0urr.github.io/ribat/
+    about: The instrument itself, with exports (CSV, JSON, GeoJSON, SVG, PNG) that carry their own caveats.
