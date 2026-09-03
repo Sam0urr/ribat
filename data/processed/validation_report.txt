@@ -1,32 +1,67 @@
 Intensity index - validation report
-generated 2026-09-01
+generated 2026-09-03
 months 1985-01 to 2026-08, 43 economies, channels: choke, crm, energy, trade, va
+own-GPR panel through 2026-08, the source 03 built Intensity from (fresher of gpr_country_monthly.csv and web/data/gpr.json), so T1 and T4 share one sample
+benchmark years 2019, 2021, 2023 (trade_weights.csv); weights properly lagged from 2020-01; T1/T2/T4 Sample A use months >= 2020-01
+weights anachronistic or contemporaneous through 2019-12: 420 of 500 months (84.0%) use the 2019 benchmark - payload agrees
+payload choke_self_excluded (strait dropped from own channel, sole covered littoral): {"SAU": ["hormuz"], "TUR": ["bosphorus"]}
+recomputed from chokepoints.csv over all six straits (covered littorals with a GPR series, economies with a trade channel): {"SAU": ["hormuz"], "TUR": ["bosphorus"]} - payload agrees
 
 ========================================================================
 T1  DISCRIMINANT VALIDITY - is Intensity just re-plotting GPR?
 ========================================================================
-  Pooled Pearson  own-GPR vs Intensity :  0.471
-  Pooled Spearman own-GPR vs Intensity :  0.503
-  Cross-sectional Spearman, mean       :  0.173   (min -0.35, max  0.68, n=92 months)
+  Sample: months >= 2020-01, the first properly lagged vintage. Earlier
+  months use contemporaneous or anachronistic weights and are excluded.
+  Pooled Pearson  own-GPR vs Intensity :  0.467
+  Pooled Spearman own-GPR vs Intensity :  0.506
+  Cross-sectional Spearman, mean       :  0.167   (min -0.35, max  0.68, n=80 months)
+  (headline: trade channel, gross basis)
+
+  Per channel - own GPR (rebased) vs the channel's rebased value:
+  channel  pooled Pearson  pooled Spearman  x-sect Spearman mean  (min, max, n months)
+  trade             0.467            0.506                 0.167  (-0.35,  0.68, n=80)
+  va                0.455            0.489                 0.101  (-0.38,  0.59, n=80)
+  energy            0.459            0.545                 0.276  (-0.29,  0.73, n=80)
+  crm               0.483            0.507                 0.192  (-0.24,  0.73, n=80)
+  choke             0.431            0.345                 0.185  (-0.48,  0.45, n=80)
 
   Interpretation: values near +1 would mean the exposure weighting is
   redundant. Values near 0 mean Intensity ranks economies differently
   from source-side GPR - i.e. it carries information GPR does not.
+  The chokepoint line is the one a trade-only T1 could not see: the
+  littoral mean now excludes the exposed economy's own GPR (03), so a
+  value well above the other channels here would mean a leak remains.
 
 ========================================================================
 T2  CHANNEL DISCRIMINATION - are the sliders decorative?
 ========================================================================
+  Sample: months >= 2020-01 (first properly lagged vintage);
+  Spearman over economy-months, rebased values.
 channel  choke    crm  energy  trade     va
 channel                                    
-choke    1.000  0.250   0.219  0.210  0.294
-crm      0.250  1.000   0.737  0.921  0.897
-energy   0.219  0.737   1.000  0.771  0.760
-trade    0.210  0.921   0.771  1.000  0.936
-va       0.294  0.897   0.760  0.936  1.000
+choke    1.000  0.274   0.200  0.226  0.289
+crm      0.274  1.000   0.746  0.922  0.900
+energy   0.200  0.746   1.000  0.778  0.764
+trade    0.226  0.922   0.778  1.000  0.937
+va       0.289  0.900   0.764  0.937  1.000
 
-  Mean off-diagonal Spearman:  0.600
+  Mean off-diagonal Spearman:  0.604
+  Pairs above 0.9: crm-trade 0.922, trade-va 0.937
+  Distinguishable channels at that threshold: 3 - crm/trade/va; choke; energy
+  choke vs the other channels: 0.20-0.29
+  energy vs the other channels: 0.20-0.78
+
   Interpretation: near +1 across the board would mean the channels are
-  the same signal and the mix is cosmetic.
+  the same signal and the mix is cosmetic. A pair above 0.9 is one
+  slider wearing two labels, so the honest count of channels is the
+  number of blocs above, not the number of sliders.
+  Here trade, the CRM proxy (WITS ores-and-metals import shares) and the
+  value-added basis co-move above 0.9: gross import shares of ores and
+  metals are near-collinear with gross trade shares, so the CRM slider
+  is not yet a fourth independent channel. The material-level CRM
+  upgrade (METHODOLOGY 3.3) is what would make it one. Energy and the
+  chokepoint channel stand apart and are the channels the mix can
+  actually move.
 
 ========================================================================
 T3  EVENT STUDIES - pre-registered expectations vs actual top movers
@@ -37,6 +72,7 @@ T3  EVENT STUDIES - pre-registered expectations vs actual top movers
     observed (abs): EGY +66.8, ZAF +45.7, JPN +28.1, KOR +26.9, THA +22.6, IDN +21.2
     observed (pct): ZAF +75%, EGY +74%, THA +36%, IDN +34%, KOR +34%, JPN +32%
     median abs move: -0.7 index points
+    WARNING 2019 <= first benchmark 2019 - weights are anachronistic or contemporaneous (2019 vintage)
 
   2022-02  Russian invasion of Ukraine   [channel: energy]
     expected      : European importers of Russian supply: POL, HUN, DEU, ITA, FIN, TUR
@@ -46,32 +82,78 @@ T3  EVENT STUDIES - pre-registered expectations vs actual top movers
 
   2022-08  Taiwan Strait crisis (Pelosi visit)   [channel: choke]
     expected      : Economies routing through the Taiwan Strait: JPN, KOR, PHL, EU-Asia traders
-    observed (abs): ZAF +124.4, CHN +109.9, IND +105.7, ISR +90.7, JPN +82.3, KOR +82.0
-    observed (pct): ZAF +124%, HUN +119%, DNK +118%, PRT +116%, NOR +113%, GBR +113%
-    median abs move: +46.3 index points
+    observed (abs): CHN +141.5, ZAF +99.8, JPN +82.4, KOR +82.3, IND +81.3, ISR +70.2
+    observed (pct): CHN +151%, ZAF +115%, HUN +111%, DNK +111%, PRT +109%, KOR +108%
+    median abs move: +36.5 index points
+    self-exclusion at taiwan_strait: covered littorals TWN, CHN; own GPR removed from the littoral mean for CHN; strait dropped entirely (sole covered littoral) for none; TWN has no chokepoint channel (not a reporter)
 
   2023-10  Israel-Gaza war onset   [channel: choke]
     expected      : Red Sea corridor users: EU-Asia traders (DEU, NLD, ITA, POL) via EGY littoral
-    observed (abs): SAU +151.1, UKR +135.8, CHE +118.1, GBR +106.0, IND +100.6, DEU +96.9
-    observed (pct): AUS +496%, MYS +256%, THA +249%, PHL +249%, VNM +244%, IDN +237%
-    median abs move: +55.1 index points
+    observed (abs): UKR +137.6, ISR +133.7, CHE +120.0, IND +118.9, GBR +107.9, DEU +98.2
+    observed (pct): AUS +501%, IDN +296%, HKG +251%, PHL +234%, VNM +226%, MYS +209%
+    median abs move: +62.2 index points
+    self-exclusion at red_sea: covered littorals EGY, SAU; own GPR removed from the littoral mean for EGY, SAU; strait dropped entirely (sole covered littoral) for none
 
   2024-01  Red Sea shipping attacks   [channel: choke]
     expected      : Same Red Sea corridor, sustained: EU-Asia traders
-    observed (abs): SAU +72.7, IND +71.0, FIN +62.7, CHE +55.5, POL +54.3, GBR +54.2
-    observed (pct): AUS +109%, MYS +85%, BRA +79%, THA +72%, VNM +70%, COL +69%
-    median abs move: +21.6 index points
+    observed (abs): ISR +85.3, IND +83.8, FIN +63.8, SWE +57.2, POL +55.9, GBR +54.9
+    observed (pct): AUS +109%, HKG +100%, BRA +79%, ISR +71%, IDN +70%, VNM +69%
+    median abs move: +25.4 index points
+    self-exclusion at red_sea: covered littorals EGY, SAU; own GPR removed from the littoral mean for EGY, SAU; strait dropped entirely (sole covered littoral) for none
 
   2001-09  9/11 [ANACHRONISTIC WEIGHTS]   [channel: trade]
     expected      : US-dependent economies: CAN, MEX
     observed (abs): CAN +424.3, MEX +410.7, USA +344.0, BEL +317.3, NOR +307.2, COL +306.4
     observed (pct): CAN +805%, MEX +775%, BEL +694%, CHE +682%, ISR +678%, FRA +670%
     median abs move: +270.6 index points
-    WARNING pre-2019 - weights are anachronistic (2019 vintage)
+    WARNING 2001 <= first benchmark 2019 - weights are anachronistic or contemporaneous (2019 vintage)
 
   1990-08  Iraq invades Kuwait [ANACHRONISTIC WEIGHTS]   [channel: energy]
     expected      : Oil importers exposed to Saudi GPR
     observed (abs): EGY +579.7, ZAF +383.5, JPN +366.0, KOR +343.9, IND +326.9, THA +287.7
     observed (pct): EGY +2073%, ZAF +1984%, IND +1184%, IDN +1142%, THA +1072%, JPN +1070%
     median abs move: +179.7 index points
-    WARNING pre-2019 - weights are anachronistic (2019 vintage)
+    WARNING 1990 <= first benchmark 2019 - weights are anachronistic or contemporaneous (2019 vintage)
+
+========================================================================
+T4  STATIC STRUCTURE OR TIME SERIES? - two-way fixed effects
+========================================================================
+  y_it = mu + alpha_i + gamma_t + eps_it on the balanced panel (economies
+  observed at every month in the window); shares of total variance.
+  'Intensity (default mix)' = theta 55/25/10/10 over trade/energy/crm/choke present,
+  rebased, gross trade basis, recomputed here from intensity_monthly.csv.
+
+  Sample A: months >= 2020-01 (first properly lagged vintage)
+  series                   N    T  economy   month    both  residual   rank(t, t-12) mean (min, max, n)
+  Intensity (default mix)  42   80    0.084   0.779   0.862     0.138   0.510 (-0.47, 0.93, n=68)
+  trade                   42   80    0.075   0.819   0.895     0.105   0.480 (-0.51, 0.93, n=68)
+  va                      42   80    0.012   0.937   0.949     0.051   0.318 (-0.75, 0.95, n=68)
+  energy                  42   80    0.233   0.506   0.739     0.261   0.701 (0.15, 0.95, n=68)
+  crm                     42   80    0.069   0.759   0.827     0.173   0.399 (-0.45, 0.80, n=68)
+  choke                   42   80    0.583   0.248   0.831     0.169   0.963 (0.88, 1.00, n=68)
+  robustness, default mix in log10 (N=42, 0 economies with a non-positive value dropped): economy 0.103, month 0.803, residual 0.095
+
+  Sample B: full sample 1985-01 to 2026-08
+  CAVEAT: weights are anachronistic or contemporaneous through 2019-12
+  (420 of 500 months, 84.0%): those months answer
+  'who would be exposed given the earliest benchmark structure', so month
+  effects here mix world risk with a frozen 2019 dependency map.
+  series                   N    T  economy   month    both  residual   rank(t, t-12) mean (min, max, n)
+  Intensity (default mix)  42  500    0.041   0.849   0.891     0.109   0.593 (-0.47, 0.95, n=488)
+  trade                   42  500    0.043   0.870   0.913     0.087   0.574 (-0.51, 0.97, n=488)
+  va                      42  500    0.008   0.954   0.963     0.037   0.495 (-0.75, 0.96, n=488)
+  energy                  42  500    0.140   0.617   0.757     0.243   0.736 (-0.10, 0.96, n=488)
+  crm                     42  500    0.057   0.767   0.824     0.176   0.547 (-0.45, 0.96, n=488)
+  choke                   42  500    0.386   0.385   0.771     0.229   0.955 (0.79, 1.00, n=488)
+  robustness, default mix in log10 (N=42, 0 economies with a non-positive value dropped): economy 0.079, month 0.832, residual 0.089
+
+  Interpretation: a residual share near zero means Intensity is a fixed
+  dependency structure recoloured by a global factor - the cross-section
+  differs from GPR (T1) but does not MOVE, and the monthly framing is not
+  earned. Thresholds fixed in advance: residual < 0.10 static;
+  0.10-0.30 partly dynamic; > 0.30 substantial
+  economy-specific month-to-month variation. Ranking mobility above
+  0.90 means the cross-sectional ranking barely moves within a year.
+
+  Verdict (Sample A, default mix): residual 0.138 -> partly dynamic: most variance is economy structure plus a common month factor, but a material share is economy-specific movement.
+  Ranking mobility 0.510 -> the ranking does move within a year.

@@ -87,7 +87,11 @@ jobs:
           # from the payload it just built. Leaving it out would publish a new
           # vintage under the previous vintage's digest, and the verifier would
           # fail on the next run against a README nobody had touched.
+          # web/data/validation.json is 04's summary of the report figures,
+          # which web/story.html reads at load; without it the story page would
+          # quote the previous vintage's numbers under the new data.
           git add -f web/data/gpr.json web/data/intensity.json \
+                     web/data/validation.json \
                      data/processed/validation_report.txt README.md
           MONTH=$(python3 -c "import json;print(json.load(open('web/data/gpr.json'))['months'][-1])")
           git commit -m "Data refresh: GPR through ${MONTH}

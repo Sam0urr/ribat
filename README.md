@@ -22,12 +22,15 @@ See [`SOURCES.md`](SOURCES.md) for the data manifest and licences.
 A direct map of country GPR already exists in at least two public forms
 (Iacoviello's own country charts; Saadaoui, November 2025). The measurement
 frontier is also closed: Iacoviello and Tong's **AI-GPR Index** (Federal Reserve
-Board, March 2026) applies LLM scoring to ~5 million archived articles. That
+Board, 2026) applies LLM scoring to about 4.6 million archived articles. That
 work rests on institutional newspaper-archive licensing, which is the actual
 barrier to entry — not model access.
 
-Exposure incidence is the part nobody has built publicly, it is answerable with
-open data, and it is the question EU policy actually asks.
+Exposure incidence itself is measured in the literature — as regression
+coefficients in working papers (METHODOLOGY §1). An interactive, open,
+reproducible, multi-channel exposure measure with movable weights is the part
+nobody has built publicly; it is answerable with open data, and it is the
+question EU policy actually asks.
 
 ---
 
@@ -44,8 +47,15 @@ are satisfied by sequencing, not by building four things.
 | **4. Methods note** | Short paper documenting construction, validation against known episodes, replication files | Academic |
 | **5. Scheduled refresh** ✅ | `.github/workflows/refresh.yml` — rebuilds and republishes when a new GPR vintage appears | Public tool |
 
-Phases 1–2 are the shippable artefact. Phase 3 is where an original contribution
-would sit. Phase 4's validation suite ships; its written methods note does not yet.
+Phases 1–2 are the shippable artefact. Such original contribution as there is
+sits in three places: the channel-weight controls as a live sensitivity
+analysis rather than a fixed index; the chokepoint construction — a
+self-excluding littoral mean, fractional transit and an auditable routing
+table (METHODOLOGY §3.4); and the distinction between percentile-ranked
+Intensity and anchored-break source-side GPR (§4). Phase 3's value-added
+weighting is the least original component — it applies a standard OECD TiVA
+indicator as an alternative basis. Phase 4's validation suite ships; its
+written methods note does not yet.
 
 
 ---
@@ -87,7 +97,9 @@ works without the workbook — which `.gitignore` excludes.
 
 `.github/workflows/refresh.yml` runs at 12:17 UTC on days 1–7 of each month, and
 on manual dispatch. It downloads the GPR workbook, re-runs stages 01, 03 and 04,
-and publishes **only if the data genuinely changed**.
+and publishes **only if the data genuinely changed**. Stage 04 also republishes
+`web/data/validation.json`, the summary of its test figures that the story page
+reads at load, so the numbers quoted there cannot go stale.
 
 Three decisions worth knowing:
 
@@ -135,8 +147,13 @@ self-hosted style covers it without a vendor account.
 
 **Pipeline:** Python (pandas, requests). Exports static JSON consumed directly
 by the front end. No server, no database, no API keys, no build step.
-Country polygons are vendored, so the published page makes zero third-party
-requests at runtime.
+Country polygons and every payload are vendored, so the map page
+(`web/index.html`) makes no third-party data requests at runtime; it loads
+exactly two libraries from `cdn.jsdelivr.net` — MapLibre GL JS, by a script and
+a stylesheet tag, and topojson-client, by a script tag. The story page
+(`web/story.html`) additionally loads its typefaces from Google Fonts
+(`fonts.googleapis.com` / `fonts.gstatic.com`), which is a third-party request
+(see `SOURCES.md`, Rendering).
 
 ---
 

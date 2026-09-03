@@ -7,30 +7,54 @@ Channels shipped:
   trade   02_build_weights.py        (M+X)/(M+X total), GPR-44 partners
   energy  02b (WITS product Fuels)   import shares
   crm     02b (WITS product OresMtls) import shares — CRM *proxy*
+  va      02c (OECD TiVA FDVA)       alternative BASIS for the trade channel
   choke   derived: trade weights x hand-coded route transit x littoral GPR
 
 The channel mix theta is NOT applied here: the web payload carries each
 channel's contribution separately and the interface mixes them client-side,
 so the sliders are a real sensitivity analysis rather than a re-run.
 
-Chokepoint channel construction:
-  transit(i,j) = set of chokepoints on the dominant sea route between i and j,
-                 from a coarse region-level routing table (below). Intra-region
-                 pairs get none (largely overland/short-sea).
-  c_choke_i,t  = sum_p [ sum_j w_trade_ij * 1{p in transit(i,j)} ] * G_p,t
-  G_p,t        = mean GPR of the chokepoint's GPR-covered littoral states
-                 (data/reference/chokepoints.csv; several true littorals lack
-                 GPR series, so the channel UNDERSTATES — see the csv notes).
+Chokepoint channel construction (METHODOLOGY.md section 3.4):
+  transit(i,j) = {chokepoint: fraction} on the dominant sea route between i
+                 and j, from a coarse region-level routing table (below).
+                 Intra-region pairs get none (largely overland/short-sea). The
+                 fraction is the share of the pair's trade assumed to pass the
+                 strait: 1.0 everywhere except the Taiwan Strait for mainland
+                 China (CHN_TS_FRACTION, derived from port throughput below).
+  c_choke_i,t  = sum_p [ sum_j w_trade_ij * f_p(i,j) ] * G_p,t^(-i)
+  G_p,t^(-i)   = mean GPR of the chokepoint's GPR-covered littoral states
+                 EXCLUDING the exposed economy i itself. The bilateral channels
+                 exclude i's own GPR by construction (w_ii is not a trade
+                 share); until the methods review the chokepoint channel did
+                 not: SAU's Hormuz term was w x G_SAU, CHN carried its own GPR
+                 through the Taiwan Strait and EGY through the Red Sea, which
+                 is why SAU topped the 2023-10 Red Sea event study. Where the
+                 exclusion leaves no littoral (SAU at Hormuz, TUR at the
+                 Bosphorus) the strait contributes nothing to that economy's
+                 channel and the pair is listed in the payload field
+                 choke_self_excluded so the interface can say so.
+                 Several true littorals lack GPR series, so the channel
+                 UNDERSTATES — see the notes in data/reference/chokepoints.csv.
 
-Weight vintage: each month t uses the latest benchmark year strictly before t;
-non-reporters carry forward their last benchmark (flagged in stale_weights).
+Weight vintage: each month t uses the latest benchmark year strictly before t
+(weight_year_for). Months before the first benchmark year have no such year
+and FALL BACK to the earliest benchmark, which postdates them: with benchmarks
+2019/2021/2023 every month through 2019-12 is computed with 2019 weights, and
+2019 itself is contemporaneous rather than lagged. Those months answer "who
+would be exposed given the 2019 structure", not "who was exposed". The payload
+records the last such month in weights_anachronistic_through — derived from
+the vintage map, never typed in — so the interface, the exports and
+04_validate.py can flag it (METHODOLOGY.md section 5.7). Non-reporters carry
+forward their last benchmark (flagged in stale_weights).
 
-Input:  data/processed/gpr_country_monthly.csv     (01)
+Input:  data/processed/gpr_country_monthly.csv     (01) or web/data/gpr.json
         data/processed/trade_weights.csv           (02)
         data/processed/channel_weights.csv         (02b, optional)
+        data/processed/va_weights.csv              (02c, optional)
         data/reference/chokepoints.csv
 Output: data/processed/intensity_monthly.csv
         web/data/intensity.json
+        web/data/weights.json
 """
 
 from __future__ import annotations
@@ -68,15 +92,46 @@ for r, isos in {
         REGION[iso] = r
 
 BALTIC_RIM = {"FIN", "SWE", "POL", "RUS"}
-TS_NORTH = {"CHN", "KOR", "JPN", "TWN", "HKG"}  # NE-Asian ports north of / at the strait
+
+# North-east Asian economies whose ports lie north of, or at, the Taiwan Strait,
+# so their traffic to Europe, the Middle East, South Asia and Africa passes it.
+# HKG was in this set until the methods review: Hong Kong sits in the Pearl
+# River delta, SOUTH of the strait, and its westbound traffic leaves via the
+# South China Sea without touching it. Listing it was an outright error.
+TS_NORTH = {"CHN", "KOR", "JPN", "TWN"}
+
+# Mainland China straddles the strait, so only part of its long-haul westbound
+# trade passes it. Fraction = share of 2024 container throughput at ports north
+# of the strait (China Ministry of Transport, 2024 port statistics, 万TEU):
+#   north: Dalian 540, Yingkou 556, Tangshan 272, Huanghua 85, Qinhuangdao 54,
+#          Tianjin 2329, Qingdao 3087, Rizhao 671, Yantai 509, Shanghai 5151,
+#          Lianyungang 669, Nantong 15, Ningbo-Zhoushan 3930, Wenzhou 145,
+#          Fuzhou 381, Yangtze-basin river ports 3170                = 21,564
+#   south: Shenzhen 3340, Guangzhou 2607, Zhuhai 128, Shantou 178,
+#          Zhanjiang 165, Beibu Gulf 902, Haikou 166, Yangpu 200,
+#          Pearl-River river ports 687, Guangxi river ports 179,
+#          Xiamen 1225 (at the strait's southern mouth, counted south) =  9,777
+#   north share = 21,564 / 31,341 = 0.69, carried as 0.7 because the routing
+#   table is region-coarse and TEU is a container proxy for all goods trade.
+# Applied whether CHN is the exposed economy or the partner: the fraction
+# describes where China's cargo is loaded, not who owns it.
+CHN_TS_FRACTION = 0.7
+
 ASIA = {"EASIA", "SEASIA", "SASIA"}
 
+# Mediterranean-coast Middle East. SAU is deliberately absent: its Asia trade
+# is Gulf-coast (Hormuz), handled by its own rule below.
+MED_ME = {"ISR", "EGY", "TUR", "TUN"}
 
-def transit(i: str, j: str) -> set[str]:
+
+def transit(i: str, j: str) -> dict[str, float]:
+    """Chokepoints on the dominant sea route between i and j, each with the
+    fraction of the pair's trade assumed to pass it (1.0 unless stated)."""
     a, b = REGION[i], REGION[j]
     if a == b:
-        return set()
-    pair, out = {a, b}, set()
+        return {}
+    pair: set[str] = {a, b}
+    out: dict[str, float] = {}
 
     # Russia <-> East Asia moves overland (rail) and across the Pacific, not
     # through Suez. Treating it as a Europe-Asia sea route put Russia atop the
@@ -86,38 +141,62 @@ def transit(i: str, j: str) -> set[str]:
 
     # Europe/Med <-> Asia/Oceania: Suez corridor
     if pair & {"EUR", "UKR", "RUS"} and pair & (ASIA | {"OCE"}):
-        out.add("red_sea")
+        out["red_sea"] = 1.0
         if pair & {"EASIA", "SEASIA"}:
-            out.add("malacca")
+            out["malacca"] = 1.0
+    # Mediterranean Middle East <-> Asia/Oceania/Africa: also the Suez corridor.
+    # Israel's trade is ~98% seaborne and its containers all move through
+    # Haifa/Ashdod on the Mediterranean, with roughly a quarter of its trade
+    # "with the East" via Suez; Turkey and Tunisia are Mediterranean states;
+    # Egypt is the canal state (its own GPR is removed from its Red Sea term by
+    # the self-exclusion rule in main()). Before the methods review this block
+    # did not exist, so ISR <-> Asia got Malacca but never the Red Sea. SAU is
+    # NOT in MED_ME and keeps its Hormuz(+Malacca) rule; no Red Sea for
+    # SAU <-> Asia.
+    if ({i, j} & MED_ME) and pair & (ASIA | {"OCE", "AFR"}):
+        out["red_sea"] = 1.0
     # Gulf (SAU) shipping: Hormuz always; Suez only for European destinations.
     # Gulf <-> Americas is routed via the Cape or trans-Atlantic depending on
     # coast and is too ambiguous to assign, so it gets no Red Sea transit.
     if "SAU" in (i, j):
-        out.add("hormuz")
+        out["hormuz"] = 1.0
         if pair & {"EUR", "UKR", "RUS"}:
-            out.add("red_sea")
+            out["red_sea"] = 1.0
         if pair & {"EASIA", "SEASIA"}:
-            out.add("malacca")
-    # East Asia <-> South Asia / Middle East / Africa: Malacca
-    if "EASIA" in pair and pair & {"SASIA", "ME", "AFR"}:
-        out.add("malacca")
+            out["malacca"] = 1.0
+    # East / South-East Asia <-> South Asia / Middle East / Africa: Malacca.
+    # For the South-East Asian reporters this is westbound traffic from Port
+    # Klang, Laem Chabang and the Vietnamese ports. Indonesia's Sunda and
+    # Lombok alternatives mean the rule slightly OVERSTATES for IDN. Until the
+    # methods review SEASIA <-> SASIA and SEASIA <-> ME/AFR were assigned
+    # nothing at all.
+    if pair & {"EASIA", "SEASIA"} and pair & {"SASIA", "ME", "AFR"}:
+        out["malacca"] = 1.0
     # Taiwan Strait: north-east Asian ports routing south or west. Explicitly
     # NOT assigned to South-East Asia <-> China flows: those run through the
     # South China Sea and bypass the strait entirely. Assigning them was a bug
     # that put Vietnam and Indonesia atop the 2022-08 Taiwan crisis event study
-    # (see 04_validate.py T3).
-    if ({i, j} & TS_NORTH) and pair & {"EUR", "ME", "SASIA", "AFR", "UKR", "RUS"}:
-        out.add("taiwan_strait")
+    # (see 04_validate.py T3). Mainland China gets the port-throughput fraction.
+    # Known omissions, left as they are because the table is region-level:
+    #   - south-China <-> Americas traffic also uses the strait NORTHBOUND
+    #     (Lloyd's List, 5 Aug 2022) and is not assigned here;
+    #   - TWN is coded 1.0 although Kaohsiung sits at the strait's southern end.
+    # No "RUS" in this set: every TS_NORTH economy is EASIA, and RUS <-> EASIA
+    # returned early above, so a Russian counterpart never reaches this rule.
+    if ({i, j} & TS_NORTH) and pair & {"EUR", "ME", "SASIA", "AFR", "UKR"}:
+        out["taiwan_strait"] = CHN_TS_FRACTION if "CHN" in (i, j) else 1.0
     # Baltic exit
     if (i in BALTIC_RIM or j in BALTIC_RIM) and not pair <= {"EUR", "RUS"}:
-        out.add("danish_straits")
+        out["danish_straits"] = 1.0
     # Black Sea exit
     if "UKR" in pair and not pair & {"EUR", "RUS"}:
-        out.add("bosphorus")
+        out["bosphorus"] = 1.0
     return out
 
 
 def weight_year_for(month: pd.Timestamp, years: list[int]) -> int:
+    """Latest benchmark year strictly before the month's year; if none exists
+    the earliest benchmark, which then POSTDATES the month (see module doc)."""
     prior = [y for y in years if y < month.year]
     return max(prior) if prior else min(years)
 
@@ -256,10 +335,21 @@ def main() -> None:
     else:
         print("NOTE va_weights.csv missing — value-added basis skipped")
     w_all = pd.concat(frames, ignore_index=True)
-    years = sorted(trade["year"].unique())
+    years = sorted(int(y) for y in trade["year"].unique())
 
     vintage = {m: weight_year_for(pd.Timestamp(m), years) for m in months}
     gpr = gpr.assign(wyear=gpr["month"].map(vintage))
+
+    # Months whose vintage does not precede them. weight_year_for returns a year
+    # >= the month's own year only when it fell back to the earliest benchmark,
+    # so this is read off the vintage map rather than typed in; the payload
+    # field and every warning downstream derive from it.
+    anachronistic = [m for m in months if vintage[m] >= pd.Timestamp(m).year]
+    weights_anachronistic_through = (
+        pd.Timestamp(max(anachronistic)).strftime("%Y-%m") if anachronistic else None)
+    print(f"weights anachronistic or contemporaneous through "
+          f"{weights_anachronistic_through}: {len(anachronistic)} of {len(months)} months "
+          f"({len(anachronistic) / len(months):.1%}) use the {min(years)} benchmark")
 
     stale_all: dict[str, int] = {}
     parts = []
@@ -286,30 +376,73 @@ def main() -> None:
 
     # ---- chokepoint channel ------------------------------------------------
     ck = pd.read_csv(REF / "chokepoints.csv")
-    littoral = {r.chokepoint: r.gpr_littoral_states.split(";") for r in ck.itertuples()}
+    present = set(gpr["iso3"].unique())
+    # Only littorals with a GPR series in this panel are "covered"; the csv
+    # already lists only those, the filter guards against a shorter panel.
+    littoral: dict[str, list[str]] = {
+        r.chokepoint: [s for s in str(r.gpr_littoral_states).split(";") if s in present]
+        for r in ck.itertuples()
+    }
 
-    # G_p,t: mean GPR over the chokepoint's covered littoral states
-    gp = {}
-    for p, states in littoral.items():
-        sub = gpr[gpr["iso3"].isin(states)]
-        g = sub.groupby("month")[["gpr", "gpr_rebased"]].mean()
-        gp[p] = g
+    # G_p,t^(-i): mean littoral GPR excluding the exposed economy. The exclusion
+    # set depends on (p, i) and not on the month, so it is built once per pair
+    # and cached; recomputing it inside the month loop would be wasted work.
+    # None means nothing remains once i is removed — i is p's only covered
+    # littoral — and p must contribute nothing to i.
+    gp_cache: dict[tuple[str, str | None], pd.DataFrame | None] = {}
+
+    def littoral_gpr(p: str, exposed: str) -> pd.DataFrame | None:
+        excl = exposed if exposed in littoral[p] else None
+        key = (p, excl)
+        if key not in gp_cache:
+            states = [s for s in littoral[p] if s != excl]
+            if not states:
+                gp_cache[key] = None
+            else:
+                sub = gpr[gpr["iso3"].isin(states)]
+                gp_cache[key] = sub.groupby("month")[["gpr", "gpr_rebased"]].mean()
+        return gp_cache[key]
 
     tr = w_all[w_all["channel"] == "trade"]
+    choke_self_excluded: dict[str, list[str]] = {}
     ck_rows = []
     for (exp, wyear), grp in tr.groupby(["exposed_iso3", "wyear"]):
         share = {p: 0.0 for p in littoral}
         for r in grp.itertuples():
-            for p in transit(exp, r.source_iso3):
-                share[p] += r.w
-        for m in months:
-            if vintage[m] != wyear:
+            for p, frac in transit(exp, r.source_iso3).items():
+                share[p] += r.w * frac
+        m_in = pd.DatetimeIndex([m for m in months if vintage[m] == wyear])
+        if m_in.empty:
+            continue
+        lvl = pd.Series(0.0, index=m_in)
+        reb = pd.Series(0.0, index=m_in)
+        for p in littoral:
+            g = littoral_gpr(p, exp)
+            if g is None:
+                # exp is p's only covered littoral: recorded whether or not the
+                # routing table sends exp's trade through p, because the rule
+                # is structural and the interface explains it as such.
+                lst = choke_self_excluded.setdefault(exp, [])
+                if p not in lst:
+                    lst.append(p)
                 continue
-            lvl = sum(share[p] * gp[p].loc[m, "gpr"] for p in littoral if m in gp[p].index)
-            reb = sum(share[p] * gp[p].loc[m, "gpr_rebased"] for p in littoral if m in gp[p].index)
+            if share[p] == 0.0:
+                continue
+            # Months without a littoral mean contribute nothing for p, as before.
+            g = g.reindex(m_in).fillna(0.0)
+            lvl += share[p] * g["gpr"]
+            reb += share[p] * g["gpr_rebased"]
+        for m in m_in:
             ck_rows.append({"exposed_iso3": exp, "month": m, "channel": "choke",
-                            "level": lvl, "rebased": reb, "covered": None})
-    intens = pd.concat([intens, pd.DataFrame(ck_rows)], ignore_index=True)
+                            "level": float(lvl[m]), "rebased": float(reb[m]),
+                            "covered": None})
+    choke_self_excluded = {k: sorted(v) for k, v in sorted(choke_self_excluded.items())}
+    print("choke_self_excluded (sole covered littoral, strait dropped from own channel): "
+          + json.dumps(choke_self_excluded))
+    # covered is None on every chokepoint row (no coverage measure exists for a
+    # strait); cast it so concat does not have to infer a dtype from all-NA.
+    ck_df = pd.DataFrame(ck_rows).astype({"covered": "float64"})
+    intens = pd.concat([intens, ck_df], ignore_index=True)
 
     intens.to_csv(PROC / "intensity_monthly.csv", index=False)
     print(f"wrote {PROC / 'intensity_monthly.csv'}  ({len(intens):,} rows)")
@@ -336,26 +469,32 @@ def main() -> None:
         countries[iso] = rec
 
     last = max(months)
-    top_sources: dict[str, list] = {}
-    lm = merged[(merged["month"] == last) & (merged["channel"] == "trade")]
-    for iso, grp in lm.groupby("exposed_iso3"):
-        top = grp.nlargest(5, "c_rebased")
-        top_sources[iso] = [
-            [r["iso3"], round(r["w"], 4), round(r["c_rebased"], 1)]
-            for _, r in top.iterrows()
-        ]
 
+    # top_sources (trade-only, last-month-only top-5 partners) was removed in the
+    # methods review: it duplicated what the reverse map derives from
+    # weights.json for any month, channel and mix.
     payload = {
         "kind": "intensity_multi",
         "channels": channels,
         "months": month_labels,
         "countries": countries,
-        "top_sources": top_sources,
-        "weight_years": [int(y) for y in years],
+        "weight_years": years,
         "stale_weights": stale_all,
+        # Last month whose weights are the earliest benchmark applied to a month
+        # it does not precede; every month <= this is anachronistic (or, in the
+        # benchmark year itself, contemporaneous). METHODOLOGY.md section 5.7.
+        "weights_anachronistic_through": weights_anachronistic_through,
+        # GPR-covered littoral table behind the chokepoint channel, and the
+        # (economy, strait) pairs dropped because the economy was the strait's
+        # only covered littoral (its own GPR would otherwise feed back).
+        "choke_littorals": littoral,
+        "choke_self_excluded": choke_self_excluded,
         "source": "Intensity = channel-weighted Caldara & Iacoviello country GPR. "
-                  "Weights: WITS/UN Comtrade benchmark years; chokepoint routing "
-                  "table in data/reference/.",
+                  "Weights: WITS/UN Comtrade benchmark years (value-added basis: "
+                  "OECD TiVA); chokepoint routing table in data/reference/. The "
+                  "chokepoint term uses the mean GPR of each strait's GPR-covered "
+                  "littoral states excluding the exposed economy's own GPR; where "
+                  "none remains the strait is dropped (choke_self_excluded).",
         "generated": pd.Timestamp.today().strftime("%Y-%m-%d"),
     }
     WEB.mkdir(parents=True, exist_ok=True)

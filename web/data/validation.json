@@ -1,0 +1,49 @@
+{
+ "kind": "validation_summary",
+ "generated": "2026-09-03",
+ "months_through": "2026-08",
+ "n_months_total": 500,
+ "n_economies": 43,
+ "sample_start": "2020-01",
+ "t1": {
+  "cross_sectional_mean": 0.167,
+  "n_months": 80,
+  "pooled_pearson": 0.467,
+  "pooled_spearman": 0.506,
+  "per_channel": {
+   "trade": 0.167,
+   "va": 0.101,
+   "energy": 0.276,
+   "crm": 0.192,
+   "choke": 0.185
+  }
+ },
+ "t2": {
+  "pairs_above_0_9": [
+   [
+    "crm",
+    "trade",
+    0.922
+   ],
+   [
+    "trade",
+    "va",
+    0.937
+   ]
+  ],
+  "mean_offdiagonal": 0.604,
+  "distinguishable_channels": 3
+ },
+ "t4": {
+  "residual_share": 0.138,
+  "month_share": 0.779,
+  "economy_share": 0.084,
+  "ranking_mobility": 0.51,
+  "choke_ranking_mobility": 0.963
+ },
+ "anachronistic": {
+  "through": "2019-12",
+  "n": 420,
+  "share": 0.84
+ }
+}
