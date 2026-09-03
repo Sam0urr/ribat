@@ -30,8 +30,13 @@
     display:flex;flex-direction:column;gap:12px;pointer-events:none}
   #left > *{pointer-events:auto}
   #controls{position:static;padding:16px;flex:1 1 auto;min-height:0;overflow-y:auto}
+  /* svh, then vh for engines without it: on iOS Safari 100vh is the tall
+     viewport, measured with the URL bar retracted, so the panel ran under the
+     browser chrome and its last rows could not be scrolled to. The small
+     viewport is the height that is always on screen. */
   #detail{top:44px;right:16px;width:300px;padding:16px;
-    max-height:calc(100vh - 60px);overflow-y:auto;overscroll-behavior:contain}
+    max-height:calc(100vh - 60px);max-height:calc(100svh - 60px);
+    overflow-y:auto;overscroll-behavior:contain}
   #legend{position:static;padding:12px 14px;flex:0 0 auto}
 
   h1{font-size:15px;margin:0 0 2px;letter-spacing:-.01em}
@@ -215,7 +220,32 @@
   .lockrow button{background:none;border:1px solid var(--line);border-radius:5px;
     color:var(--muted);font:inherit;font-size:10px;padding:2px 7px;cursor:pointer}
   .lockrow button:hover{border-color:var(--accent);color:var(--accent)}
+  /* The overlay layout needs roughly 620px of width for the two panels plus
+     their margins. Below that they overlapped each other — 247px of overlap at
+     375px, detail over controls, both on z-index 10 — and together covered all
+     but a 16px strip of the map. So on a narrow screen the panels stop being
+     an overlay: the map keeps the top of the viewport and the panels stack
+     under it in normal flow, which is the one arrangement two boxes of
+     unpredictable height can hold without occluding anything. Order is set
+     explicitly because the detail panel is what a country tap produces and
+     must not sit below the whole control column. */
   @media (max-width:900px){
+    html,body{height:auto;min-height:100%}
+    body{display:flex;flex-direction:column}
+    .banner{position:static;order:0}
+    /* svh, not dvh: the small viewport height is the one that does not move
+       when the URL bar retracts, so the map container keeps a fixed height
+       for the whole scroll. A container that resized mid-scroll would need a
+       map.resize() on every step, and a stale WebGL canvas renders the globe
+       at the wrong aspect. min-height covers landscape, where 52% is thin. */
+    #map{position:relative;inset:auto;order:1;flex:none;width:100%;
+      height:52vh;height:52svh;min-height:240px}
+    #left,#detail{position:static;order:3;width:auto;top:auto;right:auto;
+      bottom:auto;left:auto;margin:10px 10px 0;max-height:none;
+      overflow:visible}
+    #detail{order:2;padding:14px}
+    #left{margin-bottom:16px}
+    #controls{overflow:visible;flex:none}
     #sankeyModal{padding:0}
     .modal-card{border-radius:0;width:100%}
     /* Shrinking 43 labelled sources to fit a phone renders them at about 4px.
