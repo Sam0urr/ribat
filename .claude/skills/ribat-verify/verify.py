@@ -22,6 +22,9 @@ KNOWN_KINDS = {"gpr_source_side", "intensity_trade", "intensity_multi", "bilater
 EXPECTED_GPR_SOURCES = 44
 MIN_EXPOSED = 40
 MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
+# The single mailbox the project publishes. Changing it here is the deliberate
+# act; the banned-token scan allows this address and no other.
+CONTACT_ALIAS = "thumb.finger.8s@icloud.com"
 ISO_RE = re.compile(r"^[A-Z]{3}$")
 
 
@@ -192,10 +195,13 @@ def main() -> int:
         (re.compile(r"\bGRE\b"), "GRE (old index name)"),
         (re.compile(r"gre\.json|gre_monthly|03_build_gre"), "gre-era filename"),
         (re.compile(r"api\.mapbox\.com|mapbox-gl(?!-)"), "Mapbox GL dependency"),
-        # Contact runs through the issue forms; no personal mailbox is
-        # published anywhere in the repository (a project alias, if one is
-        # ever created, goes in .github/ISSUE_TEMPLATE/config.yml).
-        (re.compile(r"@(icloud|gmail|outlook|hotmail|yahoo|me)\.com", re.I), "personal mailbox"),
+        # Contact runs through the issue forms plus exactly one project alias
+        # (CONTACT_ALIAS), which is declared in .github/ISSUE_TEMPLATE/config.yml
+        # and excluded here by the lookbehind. Any other personal mailbox in
+        # tracked source is a leak - the account address most of all - so it
+        # fails rather than being reviewed for.
+        (re.compile(r"(?<!" + re.escape(CONTACT_ALIAS.split("@")[0]) + r")"
+                    r"@(icloud|gmail|outlook|hotmail|yahoo|me)\.com", re.I), "personal mailbox"),
     ]
     tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
                              text=True).stdout.split()
@@ -856,6 +862,14 @@ def main() -> int:
         for f in ("data-request.yml", "methodology-question.yml", "bug-or-data-issue.yml",
                   "general-question.yml", "config.yml"):
             check((forms / f).is_file(), f".github/ISSUE_TEMPLATE/{f} present")
+        # One published mailbox, in one place. A contact address that spreads
+        # into the pages or the docs is one that cannot later be retired.
+        cfg = (forms / "config.yml").read_text(encoding="utf-8") if (forms / "config.yml").is_file() else ""
+        check(CONTACT_ALIAS in cfg, "the project contact alias is declared in ISSUE_TEMPLATE/config.yml")
+        elsewhere = sorted(t for t in scan if t != ".github/ISSUE_TEMPLATE/config.yml"
+                           and CONTACT_ALIAS in (ROOT / t).read_text(encoding="utf-8", errors="ignore"))
+        check(not elsewhere, "the contact alias appears nowhere else in tracked source"
+              + ("" if not elsewhere else " -> " + ", ".join(elsewhere[:5])))
 
     # ── result --------------------------------------------------------------
     print()
