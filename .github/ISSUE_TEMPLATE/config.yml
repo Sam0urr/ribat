@@ -1,7 +1,9 @@
 # Issue forms are the project's request and contact channel. They are public,
 # searchable, and need no server, which keeps the site's zero-third-party
-# invariant intact. No personal mailbox is published here or anywhere in the
-# repository; a project alias can be added as a contact_link when one exists.
+# invariant intact. The one mailbox published anywhere in the repository is the
+# project alias below, for correspondents who will not or cannot file publicly;
+# the verifier allows that address here and rejects every other personal
+# mailbox in tracked source.
 blank_issues_enabled: true
 contact_links:
   - name: Read the methodology first
@@ -10,3 +12,6 @@ contact_links:
   - name: Open the map
     url: https://sam0urr.github.io/ribat/
     about: The instrument itself, with exports (CSV, JSON, GeoJSON, SVG, PNG) that carry their own caveats.
+  - name: General question or media enquiry
+    url: mailto:thumb.finger.8s@icloud.com
+    about: For questions that do not fit the forms, or if you would rather not post publicly. Replies are slower than on an issue.
