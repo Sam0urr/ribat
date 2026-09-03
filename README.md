@@ -206,7 +206,7 @@ are preliminary and subject to revision.
 **Step 2 — run the pipeline.**
 
 ```bash
-pip install pandas numpy scipy xlrd openpyxl requests
+pip install -r requirements.txt
 python3 pipeline/01_load_gpr.py               # GPR workbook -> tidy series
 python3 pipeline/02_build_weights.py          # WITS gross trade weights
 python3 pipeline/02b_build_channel_weights.py # energy + raw-material weights

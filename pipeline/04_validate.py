@@ -148,7 +148,7 @@ def load_gpr_panel() -> pd.DataFrame:
         "build_intensity", ROOT / "pipeline" / "03_build_intensity.py")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
-    gpr = mod.load_gpr()
+    gpr, _source = mod.load_gpr()
     return gpr[gpr["variant"] == "recent"]
 
 
