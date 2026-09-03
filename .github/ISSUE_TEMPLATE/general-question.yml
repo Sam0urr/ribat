@@ -1,0 +1,18 @@
+name: General question
+description: Anything else about the project, for media, policy or general enquiries, and for people who do not want the other forms.
+title: "[Question] "
+labels: ["question"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: What would you like to know?
+    validations:
+      required: true
+  - type: input
+    id: contact
+    attributes:
+      label: Email (optional)
+      description: Only if you want a reply outside GitHub. Issues are public; leave blank if you would rather not post an address.
+    validations:
+      required: false

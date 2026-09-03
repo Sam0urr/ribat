@@ -1,0 +1,96 @@
+name: Data request
+description: Ask for a cut of the derived series the exports do not already give you, or for a replication file.
+title: "[Data] "
+labels: ["data-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: the map exports a cross-section (every economy at one month)
+        and a time series (one economy, all months) as CSV or JSON, plus GeoJSON,
+        SVG and PNG, and the full monthly payload is committed at
+        `web/data/intensity.json` under CC BY 4.0. Use this form when you need
+        something those do not give you: a custom channel mix across all
+        economy-months, the bilateral weight blocks in tabular form, a specific
+        benchmark vintage, or a replication artefact.
+
+        Two limits apply. Raw UN Comtrade / WITS pulls cannot be re-disseminated
+        (SOURCES.md), so requests are met from the derived shares only. And the
+        Caldara–Iacoviello GPR series are CC BY: anything supplied carries their
+        citation forward, and so must anything you publish from it.
+  - type: input
+    id: economies
+    attributes:
+      label: Economies
+      description: ISO3 codes, or "all". Exposed economies are the 43 on the map; sources are the 44 GPR countries.
+      placeholder: "e.g. DEU, POL, FIN — or all"
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: Channel or basis
+      multiple: true
+      options:
+        - Mixed index (state the mix below)
+        - Trade (gross)
+        - Trade (value added, TiVA FDVA)
+        - Energy
+        - Critical raw materials (ores and metals proxy)
+        - Chokepoint
+        - Bilateral weight blocks
+    validations:
+      required: true
+  - type: input
+    id: period
+    attributes:
+      label: Period
+      description: Months as YYYY-MM. The series run 1985-01 to the latest GPR month; months through 2019-12 use the 2019 benchmark and are flagged anachronistic (§5.7).
+      placeholder: "e.g. 2020-01 to 2026-08"
+    validations:
+      required: true
+  - type: dropdown
+    id: normalisation
+    attributes:
+      label: Normalisation and coverage mode
+      description: See §4 and §5.4. If unsure, leave the default; the file header will state what was applied.
+      options:
+        - Rebased, as observed (default)
+        - Rebased, per observed dependency
+        - Level, as observed
+        - Level, per observed dependency
+    validations:
+      required: false
+  - type: input
+    id: mix
+    attributes:
+      label: Channel mix (mixed index only)
+      description: Trade / energy / raw materials / chokepoint, summing to 100. The interface default is 55/25/10/10 and is illustrative, not derived.
+      placeholder: "55 / 25 / 10 / 10"
+    validations:
+      required: false
+  - type: dropdown
+    id: format
+    attributes:
+      label: Format
+      options:
+        - CSV
+        - JSON
+        - Parquet
+        - Other (say which below)
+    validations:
+      required: true
+  - type: textarea
+    id: purpose
+    attributes:
+      label: What it is for
+      description: Optional, but it helps choose the right cut and note the caveats that matter for that use (not a forecast; media-vantage bias; coverage).
+    validations:
+      required: false
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Attribution
+      options:
+        - label: I will carry the Caldara & Iacoviello (2022) CC BY citation and the download date with anything I publish from this data.
+          required: true

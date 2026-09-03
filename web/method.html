@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ribat · method</title>
+<meta name="description" content="How the Ribat Intensity index is built: the definition, the four dependency channels, the normalisation choice, the known limitations and the export contract. Rendered from the repository&#x27;s METHODOLOGY.md.">
+<meta property="og:title" content="Ribat · method">
+<meta property="og:description" content="How the Ribat Intensity index is built: the definition, the four dependency channels, the normalisation choice, the known limitations and the export contract. Rendered from the repository&#x27;s METHODOLOGY.md.">
+<meta name="ribat-source" content="METHODOLOGY.md">
+<meta name="ribat-source-sha256" content="88d821143beea8e12c0766043fec3da3ad0ccda9a798bc9e86a2b61385b88fc3">
+<link href="./vendor/fonts.css" rel="stylesheet">
+<style>
+:root{
+  --ink:#070b12; --ink-2:#0c131f;
+  --bone:#ece4d4; --bone-2:#b9b3a6; --muted:#767f8f;
+  --blue:#6da7ec; --blue-mid:#3987e5; --blue-deep:#1c5cab;
+  --amber:#d9a441;
+  --line:rgba(236,228,212,.13); --line-2:rgba(236,228,212,.07);
+  --display:'Fraunces',Georgia,'Times New Roman',serif;
+  --sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --gutter:clamp(20px,5vw,64px);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--ink);color:var(--bone-2);
+  font-family:var(--sans);font-weight:300;line-height:1.68;font-size:16.5px;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(120% 80% at 78% -10%, rgba(41,106,191,.16), transparent 60%),
+    radial-gradient(90% 60% at 8% 105%, rgba(217,164,65,.07), transparent 62%),
+    repeating-linear-gradient(0deg,var(--line-2) 0 1px,transparent 1px 88px),
+    repeating-linear-gradient(90deg,var(--line-2) 0 1px,transparent 1px 88px);
+}
+main,header,footer{position:relative;z-index:2}
+
+h1,h2,h3{font-family:var(--display);font-weight:400;color:var(--bone);
+  letter-spacing:-.02em;font-variation-settings:'opsz' 96,'SOFT' 0,'WONK' 1}
+a{color:var(--blue);text-underline-offset:3px;text-decoration-thickness:1px;
+  overflow-wrap:anywhere}
+a:hover{color:var(--bone)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--muted)}
+.rule{height:1px;background:var(--line);border:0;margin:56px 0 0}
+
+header{position:sticky;top:0;z-index:40;
+  background:linear-gradient(180deg,rgba(7,11,18,.94),rgba(7,11,18,.72) 70%,transparent);
+  backdrop-filter:blur(10px)}
+nav{display:flex;align-items:center;gap:26px;padding:16px var(--gutter);
+  border-bottom:1px solid var(--line-2)}
+nav .mark{font-family:var(--display);font-size:19px;color:var(--bone);
+  letter-spacing:.01em;font-variation-settings:'opsz' 40,'WONK' 1;text-decoration:none}
+nav .mark span{color:var(--amber)}
+nav .sp{flex:1}
+nav a{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;
+  text-transform:uppercase;text-decoration:none;color:var(--muted)}
+nav a:hover,nav a[aria-current]{color:var(--bone)}
+
+.hero{padding:clamp(56px,10vh,120px) var(--gutter) clamp(36px,6vh,64px);max-width:1220px}
+.hero .eyebrow{display:block;margin-bottom:22px}
+.hero h1{font-size:clamp(34px,5.6vw,76px);line-height:1;margin:0 0 26px;max-width:18ch;
+  letter-spacing:-.035em;font-weight:300}
+.hero h1 em{font-style:italic;color:var(--amber);font-weight:400}
+.hero .lede{font-size:clamp(16px,1.8vw,19px);max-width:60ch;color:var(--bone-2);
+  font-weight:300;line-height:1.6;margin:0}
+.hero .lede strong{color:var(--bone);font-weight:500}
+.meta{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;color:var(--muted);
+  display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:26px}
+.meta b{color:var(--bone-2);font-weight:400}
+
+.wrap{display:grid;grid-template-columns:250px minmax(0,1fr);gap:clamp(28px,5vw,80px);
+  align-items:start;padding:0 var(--gutter) clamp(60px,10vh,120px);max-width:1220px}
+.toc{position:sticky;top:84px;font-family:var(--mono);font-size:11.5px;
+  letter-spacing:.03em;line-height:1.55;border-top:1px solid var(--line);padding-top:18px}
+.toc .eyebrow{display:block;margin-bottom:14px}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc li{margin:0 0 8px}
+.toc ol ol{margin:8px 0 12px 0;padding-left:0}
+.toc ol ol li{margin:0 0 5px}
+.toc a{color:var(--muted);text-decoration:none;display:flex;gap:10px}
+.toc a:hover{color:var(--bone)}
+.toc .n{color:var(--amber);flex:0 0 2.6em}
+.toc ol ol .n{color:var(--muted)}
+
+article{max-width:70ch;min-width:0}
+article h2{font-size:clamp(26px,3.6vw,42px);line-height:1.06;margin:28px 0 22px;
+  letter-spacing:-.03em;font-weight:300;scroll-margin-top:92px}
+article h3{font-size:clamp(20px,2.3vw,25px);line-height:1.2;margin:46px 0 14px;
+  letter-spacing:-.015em;scroll-margin-top:92px}
+article h3.runin{font-size:clamp(19px,2.1vw,23px);margin-top:40px}
+article .n{font-family:var(--mono);font-size:.5em;color:var(--amber);letter-spacing:.12em;
+  vertical-align:middle;margin-right:14px;font-variation-settings:normal}
+article h3 .n{font-size:.62em}
+article p{margin:0 0 18px}
+article strong{color:var(--bone);font-weight:500}
+article em{color:var(--bone)}
+article ul{padding-left:20px;margin:0 0 18px}
+article li{margin:0 0 10px;padding-left:4px}
+article blockquote{border-left:2px solid var(--amber);margin:0 0 18px;padding:4px 0 4px 18px;
+  color:var(--bone-2)}
+code{font-family:var(--mono);font-size:.86em;color:var(--bone);
+  background:rgba(236,228,212,.06);padding:.08em .35em;border-radius:2px}
+pre{font-family:var(--mono);font-size:13px;line-height:1.65;color:var(--bone);
+  background:linear-gradient(180deg,var(--ink-2),rgba(12,19,31,.4));
+  border:1px solid var(--line);border-radius:3px;padding:16px 18px;overflow-x:auto;
+  margin:6px 0 22px}
+pre code{background:none;padding:0;font-size:inherit;color:inherit}
+.tbl{overflow-x:auto;margin:6px 0 24px}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;vertical-align:top;padding:9px 14px 9px 0;
+  border-bottom:1px solid var(--line-2)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);font-weight:400;border-bottom:1px solid var(--line)}
+td:first-child{white-space:nowrap}
+
+.cta{display:inline-flex;align-items:center;gap:14px;margin-top:30px;
+  font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+  text-decoration:none;color:var(--ink);background:var(--bone);
+  padding:15px 26px;border-radius:2px;transition:transform .3s,background .3s}
+.cta:hover{background:var(--amber);color:var(--ink);transform:translateX(5px)}
+footer{border-top:1px solid var(--line);padding:36px var(--gutter) 72px;
+  font-size:12.5px;color:var(--muted);line-height:1.75}
+footer p{max-width:76ch;margin:0 0 10px}
+footer a{color:var(--bone-2)}
+
+@media (max-width:900px){
+  .wrap{grid-template-columns:1fr;gap:0}
+  .toc{position:static;border:1px solid var(--line);padding:16px 18px;margin-bottom:28px}
+  .hero h1{max-width:none}
+  td:first-child{white-space:normal}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{
+  body{background:#fff;color:#222;font-size:11pt}
+  body::before{display:none}
+  header,.toc,.cta{display:none}
+  .wrap{display:block;padding:0}
+  h1,h2,h3,article strong,article em,code,pre{color:#000}
+  .hero h1 em,article .n,.toc .n{color:#000}
+  pre{background:#f4f2ec;border-color:#bbb}
+  code{background:#f4f2ec}
+  a{color:#000}
+  th,td{border-color:#ccc}
+  th{color:#444}
+  footer{color:#444}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <nav>
+    <a class="mark" href="./index.html">Ribat<span>.</span></a>
+    <span class="sp"></span>
+    <a href="./index.html">The map</a>
+    <a href="./story.html">The story</a>
+    <a href="./method.html" aria-current="page">Method</a>
+    <a href="https://github.com/Sam0urr/ribat">Source</a>
+    <a href="https://github.com/Sam0urr/ribat/issues/new/choose">Ask</a>
+  </nav>
+</header>
+
+<main>
+
+  <section class="hero">
+    <span class="eyebrow">Ribāṭ · the contract the pipeline is held to</span>
+    <h1>Methodology <em>Ribat Intensity Index</em></h1>
+    <p class="lede">This page is the typeset copy of
+      <a href="https://github.com/Sam0urr/ribat/blob/main/METHODOLOGY.md"><code>METHODOLOGY.md</code></a>,
+      the document every pipeline stage and every panel of the map is checked
+      against. It is <strong>rendered from that file, not written separately</strong>;
+      the repository's verifier fails if the two diverge. Section references (§)
+      link to their targets. A question about a particular section can be raised
+      through the <a href="https://github.com/Sam0urr/ribat/issues/new?template=methodology-question.yml">methodology
+      issue form</a>.</p>
+    <div class="meta"><span><b>Status</b> draft v0.2, 2 September 2026</span><span><b>Author</b> S.</span></div>
+  </section>
+
+  <div class="wrap">
+    <aside class="toc" aria-label="Contents">
+      <span class="eyebrow">Contents</span>
+      <ol><li><a href="#s1"><span class="n">1</span><span>The gap this addresses</span></a></li><li><a href="#s2"><span class="n">2</span><span>Definition</span></a></li><li><a href="#s3"><span class="n">3</span><span>Channels</span></a><ol><li><a href="#s3-1"><span class="n">3.1</span><span>Trade exposure</span></a></li><li><a href="#s3-2"><span class="n">3.2</span><span>Energy exposure</span></a></li><li><a href="#s3-3"><span class="n">3.3</span><span>Critical raw materials</span></a></li><li><a href="#s3-4"><span class="n">3.4</span><span>Chokepoint transit</span></a></li></ol></li><li><a href="#s4"><span class="n">4</span><span>Normalisation — and why it is a user choice</span></a></li><li><a href="#s5"><span class="n">5</span><span>Known limitations</span></a><ol><li><a href="#s5-1"><span class="n">5.1</span><span>Media vantage bias</span></a></li><li><a href="#s5-2"><span class="n">5.2</span><span>Direct exposure only</span></a></li><li><a href="#s5-3"><span class="n">5.3</span><span>Endogeneity of the weights</span></a></li><li><a href="#s5-4"><span class="n">5.4</span><span>Coverage</span></a></li><li><a href="#s5-5"><span class="n">5.5</span><span>Not a forecast</span></a></li><li><a href="#s5-6"><span class="n">5.6</span><span>How far the source attribution reconciles</span></a></li><li><a href="#s5-7"><span class="n">5.7</span><span>Weight vintages before 2020 are anachronistic</span></a></li><li><a href="#s5-8"><span class="n">5.8</span><span>Channel discrimination — and whether the ranking moves</span></a></li></ol></li><li><a href="#s6"><span class="n">6</span><span>Export contract</span></a></li><li><a href="#s7"><span class="n">7</span><span>Attribution</span></a></li></ol>
+    </aside>
+    <article>
+<hr class="rule">
+<h2 id="s1"><span class="n">1</span>The gap this addresses</h2>
+<p>The Caldara–Iacoviello Geopolitical Risk (GPR) index and its country-specific variants measure risk <strong>emanating from or involving</strong> a country, as recorded in anglophone newspaper coverage. They are <em>source-side</em> measures.</p>
+<p>Existing visualisations — including Saadaoui's November 2025 world map (the January–September 2025 mean GPR, rebased to the 1985–2023 mean = 100; <a href="#s7">§7</a>) and the country charts on Iacoviello's own site — map that source-side quantity directly onto country polygons. This is informative but analytically incomplete: it tells you where instability is reported, not who bears its economic consequences.</p>
+<p>The second quantity is the <strong>incidence</strong> of geopolitical risk. A shock in the Strait of Hormuz is a risk <em>in</em> Iran and Oman; it is a cost <em>to</em> Japan, Korea, India and, through refined product and LNG channels, the European Union. Incidence is not an open question: it is actively measured, but delivered as regression coefficients in working papers rather than as an inspectable instrument. Mulabdic and Yotov (World Bank Policy Research Working Paper 11219) build trade-weighted partner GPR; the IMF's April 2025 <em>Global Financial Stability Report</em>, chapter 2, traces cross-border GPR transmission through trade and financial links; an ECB blog post of 28 November 2025 measures central and eastern European exposure through Russian links and energy reliance; Bank of England Staff Working Paper 1159 offers a regional supply-chain exposure toolkit; Florence Working Paper 02/2026 constructs a regional exposure index; Verschuur et al. (<em>Nature Communications</em>, 2025) and IMF PortWatch measure physical chokepoint exposure; and Banco de España Documentos Ocasionales 2603 (2026) measures bilateral geopolitical risk from the perceiving side (<a href="#s5-1">§5.1</a>). What this project adds is the same structure delivered as an open, reproducible, multi-channel instrument: movable channel weights, reverse attribution from an exposed economy back to its sources, and displayed residuals wherever a construction falls short of its own identity.</p>
+<hr class="rule">
+<h2 id="s2"><span class="n">2</span>Definition</h2>
+<p>For an exposed economy <em>i</em>, a source country <em>j</em>, and month <em>t</em>:</p>
+<pre><code>INT_i,t  =  Σ_c  θ_c  ·  Σ_j  w^c_ij,t-k  ·  G_j,t</code></pre>
+<p>where</p>
+<div class="tbl"><table><thead><tr><th scope="col">Term</th><th scope="col">Meaning</th></tr></thead><tbody><tr><td><code>G_j,t</code></td><td>Country-specific GPR of source country <em>j</em> in month <em>t</em> (44 countries available)</td></tr><tr><td><code>w^c_ij,t-k</code></td><td>Dependency weight of <em>i</em> on <em>j</em> through channel <em>c</em>, lagged <em>k</em> periods</td></tr><tr><td><code>θ_c</code></td><td>Channel weight, <code>Σ_c θ_c = 1</code>, <strong>user-adjustable in the interface</strong></td></tr><tr><td><code>c</code></td><td>Channel index: trade, energy, critical raw materials, chokepoint</td></tr></tbody></table></div>
+<p>The channel weights <code>θ_c</code> are deliberately exposed as controls rather than fixed. There is no defensible single answer to how energy dependency trades off against raw-material concentration; presenting one would be false precision. Making the weights movable converts the interface from a claim into a sensitivity analysis, which is both more honest and more useful.</p>
+<p>The default mix the page opens with — 55 trade / 25 energy / 10 raw materials / 10 chokepoint — is an <strong>illustrative starting point, not a derived weighting</strong>. Nothing in the data selects it; it is stated as such beside the sliders, and the export header records the mix actually in force when a file was written.</p>
+<p>Nor are the four sliders four independent channels. Validation test T2 (<a href="#s5-8">§5.8</a>) finds that the raw-material proxy (WITS ores-and-metals import shares) is near-collinear with gross trade: Spearman 0.922 between the CRM and trade channels over economy-months, 0.937 between the trade channel's gross and value-added bases, and 0.900 between CRM and value added. Gross import shares of ores and metals track gross import shares of everything. The instrument therefore has <strong>three distinguishable channels</strong> — a trade/value-added/CRM bloc, energy, and chokepoint — and the fourth slider mostly re-labels the first. The material-level CRM construction described as the upgrade path in <a href="#s3-3">§3.3</a> is what would make that slider informative.</p>
+<hr class="rule">
+<h2 id="s3"><span class="n">3</span>Channels</h2>
+<h3 id="s3-1"><span class="n">3.1</span>Trade exposure</h3>
+<pre><code>w^trade_ij = (M_ij + X_ij) / (M_i + X_i)</code></pre>
+<p>Bilateral goods trade as a share of <em>i</em>'s total goods trade.</p>
+<p><strong>Source:</strong> UN Comtrade, accessed via the World Bank WITS API (same underlying data, no API key, and no 500-record truncation cap — the Comtrade free preview caps at 500 rows, which is almost exactly one reporter's partner count). Eurostat Comext remains the upgrade path for EU members (finer product detail, monthly frequency).</p>
+<p>Two construction details verified against the raw data (Aug 2026):</p>
+<ul><li><strong>Denominator.</strong> WITS <code>partner/all</code> responses include World Bank region and income aggregates (ECS, EAS, NAC, …) alongside countries; summing partners double-counts total trade by roughly 2x. The denominator is therefore the reported <code>WLD</code> total, and the numerator is restricted to the 44 GPR countries. A consequence worth stating as an identity: the weights of a channel sum not to one but to the covered share, <code>Σ_j w^c_ij = covered_share^c_i</code>, so each channel value equals the covered share times the mean partner GPR over the partners GPR observes. <a href="#s5-4">§5.4</a> sets out what that does to the ranking and how the interface lets the reader undo it.</li><li><strong>Taiwan.</strong> Comtrade reports Taiwan only as "Other Asia, nes" (OAS). That bucket is overwhelmingly Taiwan and is remapped to TWN, so Taiwan enters Intensity as a risk <em>source</em>. It cannot enter as an exposed economy: it is not a Comtrade reporter.</li><li><strong>Non-reporters.</strong> Russia has no 2023 benchmark; an exact-year join drops it from the map for every month from 2024 onward, which reads to a viewer as a rendering fault rather than a data limitation. Weights are therefore carried forward from each economy's last reported benchmark, and the affected economies are named in the payload (<code>stale_weights</code>) and flagged in the detail panel. Carried-forward weights become less representative the further they are extrapolated — for Russia specifically, 2021 shares predate the reorientation of its trade, so its Intensity is best read as <em>exposure under its pre-invasion trade structure</em>, not its current one. Verified against the August 2026 data, Russia is the only affected economy.</li></ul>
+<p><strong>Benchmark years.</strong> Weights are cross-sections at 2019 (pre-Covid), 2021 (pre-invasion) and 2023 (latest available in WITS; 2024 not yet published). Each month <em>t</em> uses the latest benchmark strictly before <em>t</em>, implementing the lag required by section 5.3. That rule has no answer for months before the first benchmark year, and the pipeline then <strong>falls back to the earliest benchmark, which postdates them</strong>: every month from January 1985 to December 2019 — 420 of the 500 months on the slider, 84.0% — is computed with 2019 weights, and 2019 itself is contemporaneous rather than lagged. Such months answer "who would be exposed given the 2019 structure", not "who was exposed". The payload records the last affected month in <code>weights_anachronistic_through</code> (derived from the vintage map, never typed in) and the interface, the exports and the validation report all flag it; <a href="#s5-7">§5.7</a> states the consequences.</p>
+<h3 id="s3-2"><span class="n">3.2</span>Energy exposure</h3>
+<pre><code>w^energy_ij = M^fuels_ij / M^fuels_i</code></pre>
+<p><em>i</em>'s gross imports of fuels from <em>j</em> as a share of <em>i</em>'s gross fuel imports from the world: WITS/Comtrade product group <code>Fuels</code> (SITC section 3 — coal, oil, gas and electricity, undifferentiated), import side only, <code>WLD</code> denominator, numerator restricted to the GPR-44. Dependency through a supply channel is an import concept, so exports do not enter; otherwise the benchmark years, denominator and Taiwan treatment are those of the trade channel. Mean GPR-covered share of fuel imports is ~0.70, lower than the trade channel because major energy exporters (Nigeria, Kazakhstan, Qatar, UAE, Iraq, Algeria) have no GPR series — the energy channel therefore <em>understates</em> exposure for their customers, and the covered share is reported so the reader can see by how much (it falls to 0.09 for the thinnest economy; <a href="#s5-4">§5.4</a>).</p>
+<p>Two things the implemented measure gets wrong in a known direction. It is <strong>gross</strong>, so it overstates dependency for refining and transit hubs — the Netherlands and Belgium import crude and products they re-export, and the share registers as their own exposure. And it is <strong>undifferentiated</strong>, so a pipeline-gas dependency and a seaborne-crude dependency, which respond to very different shocks, are summed as one.</p>
+<pre><code>w^energy_ij = E_ij / E_i</code></pre>
+<p>the share of <em>i</em>'s <strong>net</strong> energy imports sourced from <em>j</em>, computed separately for crude oil, refined products, natural gas (pipeline) and LNG, then aggregated by gross-inland-consumption share. Sources would be Eurostat <code>nrg_ti_*</code> and <code>nrg_bal_*</code> for EU members and IEA energy balances for the rest.</p>
+<h3 id="s3-3"><span class="n">3.3</span>Critical raw materials</h3>
+<pre><code>w^crm_ij = M^ores_ij / M^ores_i</code></pre>
+<p><em>i</em>'s gross imports of ores, minerals and non-ferrous metals from <em>j</em> as a share of <em>i</em>'s gross imports of the same from the world: WITS/Comtrade product group <code>OresMtls</code> (SITC 27 + 28 + 68), import side only, same denominator and Taiwan treatment as the trade channel. This is a <strong>proxy</strong>: broader than the EU Critical Raw Materials Act list (it includes bulk commodities such as iron ore), blind to criticality, and — as T2 shows (<a href="#s2">§2</a>, <a href="#s5-8">§5.8</a>) — near-collinear with gross trade shares, so the slider does not yet move the index independently. It is used because it is the finest open cut available from the same source as the other channels. No concentration measure is computed anywhere in the pipeline or the interface.</p>
+<pre><code>w^crm_ij = Σ_m  s_m,i  ·  (I_ijm / I_im)</code></pre>
+<p>where <em>m</em> would index materials on the EU Critical Raw Materials Act list, <code>I_ijm</code> <em>i</em>'s imports of material <em>m</em> from <em>j</em>, and <code>s_m,i</code> a criticality weight for material <em>m</em>. Supply concentration would be reported alongside as a Herfindahl–Hirschman index so that concentration and risk could be read separately rather than conflated. Sources would be the JRC Raw Materials Information System (RMIS) and Comext at HS-6.</p>
+<h3 id="s3-4"><span class="n">3.4</span>Chokepoint transit</h3>
+<p>Not a bilateral weight. For each maritime chokepoint <em>p</em> (Hormuz, Bab el-Mandeb, Suez, Malacca, Taiwan Strait, Panama, Danish Straits, Bosphorus):</p>
+<pre><code>w^choke_ip = (volume of i's seaborne imports transiting p) / (total seaborne imports of i)
+G_p,t      = weighted mean GPR of p's littoral states</code></pre>
+<p><strong>Implemented (Phase 2, revised in the methods review):</strong> per-importer transit volumes do not exist as open data, so the transit share is approximated from the gross bilateral trade weights and a coarse, hand-coded region-level routing table (in <code>03_build_intensity.py</code>, auditable as code):</p>
+<pre><code>c_choke_i,t   = Σ_p [ Σ_j w^trade_ij · f_p(i,j) ] · G_p,t^(−i)
+G_p,t^(−i)    = mean_{j ∈ L_p \ {i}}  G_j,t</code></pre>
+<p>where <code>f_p(i,j)</code> is the fraction of the pair's trade assumed to pass <em>p</em> (1.0 wherever a route is assigned, with one exception below), <code>L_p</code> is the set of <em>p</em>'s GPR-covered littoral states (<code>data/reference/chokepoints.csv</code>), and intra-regional pairs transit nothing (largely overland or short-sea). Six chokepoints are tracked — the Red Sea corridor (Suez + Bab el-Mandeb as one), Hormuz, Malacca, the Taiwan Strait, the Bosphorus and the Danish Straits. Panama is <em>excluded</em>: no littoral or proximate state has a GPR series. The chokepoint channel always uses the gross trade weights, whichever basis the trade channel is displayed on.</p>
+<p><em>Self-exclusion.</em> The bilateral channels exclude an economy's own GPR by construction — <code>w_ii</code> is not a trade share. Until the methods review the chokepoint channel did not: Saudi Arabia's Hormuz term was <code>Σ_j w_SAU,j × G_SAU</code>, China carried its own GPR through the Taiwan Strait, and Egypt its own through the Red Sea. Taiwan could not: it is not a Comtrade reporter, so it has no chokepoint channel and enters the strait only as a littoral. Only Saudi Arabia, China and Egypt carried their own GPR. That leak is why Saudi Arabia topped the October 2023 Red Sea event study (+151 index points) and why its own GPR correlated 0.95 with its own chokepoint channel. The littoral mean now <strong>excludes the exposed economy</strong>: <code>G_p,t^(−i)</code> averages over <code>L_p \ {i}</code>. Where nothing remains — the economy was the strait's only covered littoral — that strait contributes nothing to that economy's chokepoint channel. This is the case for Saudi Arabia at Hormuz and for Turkey at the Bosphorus; both pairs are computed by the pipeline, never hard-coded, and shipped in the payload as <code>choke_self_excluded</code> (<code>{"SAU": ["hormuz"], "TUR": ["bosphorus"]}</code>) so the detail panel can say so. After the change Saudi Arabia's own-GPR correlation with its chokepoint channel falls from 0.95 to 0.50 and China's from 0.70 to 0.62 (Pearson, months from 2020-01, the same panel as <a href="#s5-8">§5.8</a>); Saudi Arabia's rebased chokepoint value at 2023-10 falls from 270 to 158, and the economies leading the Red Sea event study are Ukraine and Israel, whose traffic the corridor actually carries.</p>
+<p><em>Fractional transit for China.</em> Mainland China straddles the Taiwan Strait, so only part of its long-haul westbound trade passes it. The fraction is set at <code>f = 0.7</code>, the share of 2024 container throughput at ports north of the strait in the China Ministry of Transport's 2024 port statistics: north — Dalian, Yingkou, Tangshan, Huanghua, Qinhuangdao, Tianjin, Qingdao, Rizhao, Yantai, Shanghai, Lianyungang, Nantong, Ningbo-Zhoushan, Wenzhou, Fuzhou and the Yangtze-basin river ports, 21,564 万TEU; south — Shenzhen, Guangzhou, Zhuhai, Shantou, Zhanjiang, Beibu Gulf, Haikou, Yangpu, the Pearl River and Guangxi river ports and Xiamen (at the strait's southern mouth, counted south), 9,777 万TEU; north share 21,564 / 31,341 = 0.69, carried as 0.7 because the table is region-coarse and TEU is a container proxy for all goods trade. The full port table is in the code comment. The fraction applies whether China is the exposed economy or the partner: it describes where the cargo is loaded, not who owns it. Every other assigned route carries 1.0.</p>
+<p><em>Routing table as it now stands.</em> Europe, Ukraine and Russia ↔ Asia and Oceania: the Red Sea corridor, plus Malacca for East and South-East Asia; Russia ↔ East Asia is the exception and transits nothing (overland rail and the Pacific). The Mediterranean Middle East — Israel, Egypt, Turkey, Tunisia — ↔ East, South-East and South Asia, Oceania and Africa: the Red Sea corridor. This block did not exist before the review, so Israel ↔ Asia was assigned Malacca but never Suez; the evidence for it is that roughly 98% of Israel's trade is seaborne, all of its containers move through Haifa and Ashdod on the Mediterranean, and about a quarter of its trade is "with the East" via Suez; Turkey and Tunisia are Mediterranean states; Egypt is the canal state, and its own GPR is removed from its Red Sea term by the self-exclusion rule. Saudi Arabia is deliberately outside that block: its Asia trade is Gulf-coast, so it keeps Hormuz always, the Red Sea for European, Ukrainian and Russian partners and Malacca for East and South-East Asian ones, and gets no Red Sea for Asia (nor for the Americas, where the Cape and trans-Atlantic routes are too ambiguous to assign). East and South-East Asia ↔ South Asia, the Middle East and Africa: Malacca — westbound traffic from Port Klang, Laem Chabang and the Vietnamese ports; before the review South-East Asia ↔ South Asia and ↔ Middle East / Africa were assigned nothing. Indonesia's Sunda and Lombok alternatives mean this slightly overstates for IDN. Taiwan Strait: economies whose ports lie north of or at the strait — China, Korea, Japan, Taiwan — ↔ Europe, the Middle East, South Asia, Africa and Ukraine (not Russia: Russia ↔ East Asia transits nothing, by the early return noted above, so no such pair ever reaches the strait rule in <code>transit()</code>). <strong>Hong Kong was removed from that northern set</strong>: it sits in the Pearl River delta, south of the strait, and its westbound traffic leaves through the South China Sea without touching it; listing it was an outright error. South-East Asia ↔ China is explicitly <em>not</em> assigned the strait (South China Sea traffic). Danish Straits: Finland, Sweden, Poland and Russia ↔ anything outside Europe/Russia. Bosphorus: Ukraine ↔ anything outside Europe/Russia.</p>
+<p><em>Known omissions, left as they are because the table is region-level:</em> south-China ↔ Americas traffic also uses the Taiwan Strait northbound (Lloyd's List, 5 August 2022) and is not assigned; Taiwan itself is coded 1.0 although Kaohsiung sits at the strait's southern end. And the littoral sets remain thin: several true littorals (Iran, Oman, UAE, Yemen, Singapore) lack GPR series, so the channel systematically <strong>understates</strong> — most severely for Hormuz, whose only covered littoral is Saudi Arabia, which now means the Gulf's own risk complex reaches Hormuz users through Saudi GPR alone and reaches Saudi Arabia itself not at all. The validation report (T1 per channel, T3 self- exclusion notes) states which economies are affected at each strait.</p>
+<p><strong>Source (upgrade path):</strong> EIA chokepoint volumes; UNCTADstat maritime; IMF PortWatch transit calls; littoral mapping maintained in <code>data/reference/chokepoints.csv</code>.</p>
+<hr class="rule">
+<h2 id="s4"><span class="n">4</span>Normalisation — and why it is a user choice</h2>
+<p><code>G_j,t</code> is a share of newspaper articles. Two rescalings answer different questions, and the interface should expose both rather than silently pick one:</p>
+<div class="tbl"><table><thead><tr><th scope="col">Mode</th><th scope="col">Formula</th><th scope="col">Question answered</th></tr></thead><tbody><tr><td><strong>Rebased</strong></td><td><code>G_j,t / mean(G_j, 1985–2023) × 100</code></td><td>Is country <em>j</em> unusually risky <em>relative to its own history</em>?</td></tr><tr><td><strong>Level</strong></td><td>raw article share, common scale</td><td>Is country <em>j</em> riskier <em>than country k</em> right now?</td></tr></tbody></table></div>
+<p>The Level question is answered less cleanly than the table suggests. A country's article share scales with how much the ten anglophone newspapers cover that country at all, so a cross-country comparison of levels is confounded by press coverage: a state that is written about constantly carries a high level in calm times, and one that is rarely covered registers a low level through a crisis. Caldara and Iacoviello note this themselves. Rebasing removes the confound — each country is compared with its own history, so its coverage share cancels — and in doing so introduces the opposite problem below. Both cautions are stated in the interface, in the note beside the normalisation control.</p>
+<p>A further caution applies to <strong>Intensity</strong> (as opposed to source-side GPR): rebased Intensity is a <em>weighted sum</em> of partner-rebased series, so it has no natural "100 = normal" anchor — an economy trading mostly with chronically elevated partners sits structurally above 100. The map therefore colours Intensity by percentile rank across economies, and reserves fixed breaks (anchored at 100) for source-side GPR only.</p>
+<p>Rebasing removes persistent level differences between countries. That is desirable when detecting deterioration, and misleading when comparing across countries: a chronically high-risk state rebases to ~100 in normal times and therefore looks calm. Saadaoui's map uses rebasing (to the 1985–2023 mean; <a href="#s7">§7</a>). Defaulting to it without saying so is the single most common error in this literature's visual output.</p>
+<hr class="rule">
+<h2 id="s5"><span class="n">5</span>Known limitations</h2>
+<p>These belong in the interface, not buried in a footnote. Each is a real constraint on interpretation.</p>
+<h3 class="runin" id="s5-1"><span class="n">5.1</span>Media vantage bias</h3>
+<p>GPR is constructed from ten anglophone newspapers. It measures the <em>salience of geopolitical risk to a Western readership</em>, not risk in any objective sense. Events in states with thin Western press coverage are systematically understated. Intensity inherits this bias fully; weighting by trade does not correct it.</p>
+<p>An earlier draft of this section claimed that the obvious remedy — GPR built from national-language press — would merely substitute one vantage point for another, and that archive licensing made it impractical in any case. That was overstated. A multilingual, national-source GPR now exists: Alonso-Alvarez, Bukina, Diakonova, Khitarishvili, Pérez and Piqueras (2026), "Geopolitical Risk: A Database of General and Bilateral Indices", Banco de España Documentos Ocasionales 2603, doi 10.53479/42445. It covers 34 economies from their own national press via Factiva in 15 languages, with monthly general indices (start years vary from 1977 for the United States to 2014–2017 for Egypt, Iran and Nigeria) and quarterly bilateral indices toward four origins — Russia, China, the Western bloc and MENA. The series are downloadable (<code>GPR_DBGlobal.xlsx</code>, <code>GPR_DBGlobal_Bilateral.xlsx</code>) from <a href="https://www.bde.es/wbe/en/areas-actuacion/analisis-e-investigacion/recursos/indices-de-riesgo-geopolitico-generales-y-bilaterales-para-34-economias-6075d2451c9da91.html">https://www.bde.es/wbe/en/areas-actuacion/analisis-e-investigacion/recursos/indices-de-riesgo-geopolitico-generales-y-bilaterales-para-34-economias-6075d2451c9da91.html</a>. The vantage-point problem is therefore no longer merely asserted; it is <em>measurable</em>, by comparing the anglophone and national-press indices for the same country over the same months.</p>
+<p>It is not adopted as <code>G_j,t</code> here, for four reasons. (i) It measures risk <em>as perceived in j's national media</em> — a perceiving-side object — whereas the formula in <a href="#s2">§2</a> needs risk <em>emanating from j</em> as seen by its partners; the two diverge exactly where the vantage bias is largest. (ii) Coverage only partly overlaps: 25 of the 44 GPR countries are in both sets (ARG AUS BEL BRA CAN CHL CHN COL EGY FRA DEU IND ITA JPN MYS MEX PHL POL PRT RUS ESP CHE THA GBR USA), 19 are not (DNK FIN HUN NOR SWE UKR NLD ISR SAU ZAF TUN TUR HKG KOR TWN IDN VNM PER VEN), and start years vary. (iii) The bilateral indices are quarterly, and the instrument is monthly. (iv) The licence permits "reproduction for educational and non-commercial purposes … provided the source is acknowledged", which is not an open licence; redistributing the series inside a web payload is not clearly permitted, and this project ships only what it may redistribute (SOURCES.md).</p>
+<p>Upgrade path: a fifth validation test, T5, comparing the Caldara–Iacoviello and Banco de España general indices for the 25 overlapping countries — a direct measurement of how much of <code>G_j,t</code> is vantage — and the Banco de España bilateral indices as prior art for incidence measured from the perceiving side, against which the source-side construction here can be checked.</p>
+<h3 class="runin" id="s5-2"><span class="n">5.2</span>Direct exposure only</h3>
+<p>Bilateral trade weights capture first-order dependency. They miss exposure routed through third countries: a German manufacturer importing intermediate goods from Poland which embody Russian inputs registers as exposure to Poland. The correction is to compute weights from value-added rather than gross flows, using OECD ICIO or WIOD input–output tables.</p>
+<p><strong>Implemented (Phase 3):</strong> the interface offers a gross / value-added toggle for the trade channel. Value-added weights are OECD TiVA <code>FDVA</code> ("origin of value added in final demand", 2025 edition, annual, currently to 2022):</p>
+<pre><code>w^va_ij = FDVA_{j→i} / (FDVA_{W→i} − FDVA_{i→i})</code></pre>
+<p>The denominator is <strong>foreign-only</strong>: domestic value added — typically 60–80% of an economy's final demand — is removed before shares are taken. Gross trade weights have no domestic term (an economy is not its own trading partner), so leaving <code>FDVA_{i→i}</code> in the denominator would make the toggle jump roughly threefold for denominator reasons alone and the two bases could not be read against each other. An earlier version of this section printed the formula with the full denominator; the code has always used the foreign-only one. Unlike the Comtrade-based weights, TiVA covers Taiwan, Russia and Venezuela as final-demand economies, so the value-added basis has no carried-forward weights. Its benchmark years (2019, 2021, 2022) are mapped to month vintages by the same latest-benchmark-before-<em>t</em> rule, 2022 serving the 2023 vintage.</p>
+<p>What FDVA measures must be stated precisely, because it is not quite the quantity the paragraph above motivates. FDVA is the origin of the value added embodied in <em>i</em>'s <strong>final demand</strong> — what <em>i</em>'s consumers, investors and government ultimately absorb, finished goods included. It looks through third countries, so Russian value added reaching Germany inside Polish intermediates is attributed to Russia; that is the look-through the toggle is for. But it is an absorption-side object, not a production-side one: it does not measure what German <em>producers</em> use as inputs. The backward-linkage quantity the German manufacturer example actually describes is the origin of value added in <em>gross imports</em> — OECD TiVA 2025 dataflow <code>DSD_TIVA_IMGRVA@DF_IMGRVA</code>, indicator <code>IMGR_BSCI</code> (value added in gross imports by importing country and partner, broken down by the country where the value added originated; Guide to OECD TiVA Indicators 2025, §7.2). That production-side cut is the upgrade path; the basis note in the interface says which object it currently shows.</p>
+<p>Divergence between the two bases is still informative on those terms: where value-added exposure exceeds gross exposure, the value added <em>i</em> absorbs from <em>j</em> is arriving through intermediary economies rather than directly, which is exactly the exposure gross bilateral weights cannot see.</p>
+<h3 class="runin" id="s5-3"><span class="n">5.3</span>Endogeneity of the weights</h3>
+<p>Trade shares respond to risk. An economy that has successfully de-risked shows <em>low</em> exposure precisely because risk was <em>high</em> — the measure inverts where it should be most informative. Mitigation: lag weights by <em>k</em> periods and report results against pre-shock benchmark shares (e.g. 2019 or 2021 for Russia-related exposure). Do not use contemporaneous weights.</p>
+<h3 class="runin" id="s5-4"><span class="n">5.4</span>Coverage</h3>
+<p>Country-specific GPR exists for 44 countries. Every channel restricts its numerator to those 44 while keeping the world total as its denominator (<a href="#s3-1">§3.1</a>), so a channel's weights sum to the covered share rather than to one, and the identity</p>
+<pre><code>c^ch_i,t  =  Σ_j w^ch_ij · G_j,t  =  covered_share^ch_i  ×  E[ G_j,t | j observed ]</code></pre>
+<p>holds for trade, value added, energy and raw materials. An economy whose partners are mostly outside the GPR set — notably in Sub-Saharan Africa and Central Asia — therefore carries a low value for a coverage reason, not an exposure one. This is not merely a downward bias: because the map colours Intensity by <strong>percentile rank</strong>, it is a <strong>ranking confound</strong>. Two economies with identical partner risk and covered shares of 0.9 and 0.5 differ 1.8× and sit in different bins. Measured on the shipped payload at its last month (2026-08) under the default mix, the rank correlation between as-observed Intensity and Intensity divided by covered share is 0.74; Saudi Arabia moves from rank 42 to 17, South Africa from 30 to 12, Israel from 31 to 16, while Mexico falls from 8 to 23 and Canada from 10 to 25 (of 42). (On the payload the review examined, before the chokepoint channel was rebuilt, the figures were 0.70 and 42→13, 30→11, 35→17, 7→24, 9→25.)</p>
+<p>The interface therefore offers a <strong>coverage toggle</strong>. <em>As observed</em> (the default) shows the identity's left-hand side, which is what the data measure. <em>Per observed dependency</em> divides each channel value by its covered share, recovering <code>E[G_j,t | j observed]</code> — the mean partner risk over the dependency GPR can see — so that thinly and thickly covered economies rank on comparable terms. Two caveats travel with it. Dividing by a thin covered share amplifies noise in proportion: energy coverage falls to 0.09 for the thinnest economy, where the division multiplies a few observed partners' GPR elevenfold. And the chokepoint channel has no coverage measure at all (its weight is a routing indicator, not a share of an observed flow; <a href="#s6">§6</a>), so it is never divided and <code>covered_choke</code> is blank. The covered share is reported next to every channel value in the detail panel and in every export, and the export header records which mode produced the file (<code>coverage_normalisation</code>; <a href="#s6">§6</a>), because a per-observed-dependency file read as an as-observed one would be wrong by the covered share on every row.</p>
+<h3 class="runin" id="s5-5"><span class="n">5.5</span>Not a forecast</h3>
+<p>GPR is a contemporaneous measure of reported risk. Intensity is a contemporaneous measure of reported exposure. Neither predicts.</p>
+<h3 class="runin" id="s5-6"><span class="n">5.6</span>How far the source attribution reconciles</h3>
+<p>The reverse view decomposes an economy's Intensity into bilateral contributions <code>theta_c * w^c_ij * G_j,t / sum_c theta_c</code>, and the routing Sankey shows each of them as a band. Two identities hold, and the interface asserts both, so both are stated here.</p>
+<p><em>Contributions sum to the attributed share, exactly.</em> Every band, the per-source totals and the <code>attributedShare</code> figure are the same sum taken at different levels of aggregation, so they agree to floating-point precision. What they do <em>not</em> sum to is Intensity: the chokepoint channel carries no bilateral source (<a href="#s3-4">§3.4</a>) and is excluded from the numerator while remaining in the denominator, so the attribution falls short by exactly <code>theta_choke * c_choke_i,t / sum_c theta_c</code>. That residual is displayed as its own figure, marked on the diagram at the point where it occurs, and is the quantity by which the Sankey's source column ends short of its channel column.</p>
+<p><em>Attributed plus chokepoint recovers Intensity, to the payload's stored precision.</em> The two are equal in construction but not bit-for-bit in the shipped data: <code>web/data/intensity.json</code> stores the channel series rounded to two decimals, whereas the bilateral weights reconstruct those channels unrounded. Measured across every economy-month in the shipped payload (42 economies with a default-mix channel × 500 months), the resulting discrepancy is at most about 2 parts in 10,000 (worst observed: SAU 1998-04, 1.7e-4 relative; median 2e-5). It is invisible at the one-decimal percentages shown and is a rounding artefact of the payload, not a coverage gap: no source is dropped, and the per-channel weight blocks reconstruct their channel value to the same tolerance.</p>
+<p>Percentages in the routing tooltips use adaptive precision for this reason. At a fixed two decimals the smallest of 43 un-pooled sources round to <code>0.00%</code>, and the displayed contributions then visibly failed to sum to the displayed attributed share — a chart whose subject is an unreconciled residual cannot afford a second, accidental one.</p>
+<h3 class="runin" id="s5-7"><span class="n">5.7</span>Weight vintages before 2020 are anachronistic</h3>
+<p>The lag rule of <a href="#s3-1">§3.1</a> and <a href="#s5-3">§5.3</a> — each month uses the latest benchmark strictly before it — has nothing to return for months before the first benchmark year, and <code>weight_year_for</code> then falls back to the earliest benchmark. With benchmarks at 2019, 2021 and 2023, every month from 1985-01 to 2019-12 is joined to the 2019 cross-section: <strong>420 of the 500 months on the slider, 84.0%</strong>, are computed with weights that postdate them, and the twelve months of 2019 use contemporaneous rather than lagged weights. The lag rule is genuinely in force only from 2020-01.</p>
+<p>Those months are not wrong, but they answer a different question. For 2001-09 or 1990-08 the map shows <strong>who would be exposed to that month's risk given the 2019 dependency structure</strong>, not who was exposed at the time: the Soviet Union's trading partners, pre-WTO China, pre-Maastricht Europe are all rendered with the trade map of 2019. Read as a counterfactual — today's dependencies under yesterday's risk — the early slider is informative; read as history it is not. The endogeneity concern of <a href="#s5-3">§5.3</a> also runs the other way here: 2019 shares already embody every de-risking decision taken in response to the risks the earlier months display.</p>
+<p>The condition is computed, not typed in. The pipeline derives the last affected month from the vintage map and emits it as <code>weights_anachronistic_through</code> (<code>"2019-12"</code> for the current benchmark set); the validation report recomputes it independently from <code>trade_weights.csv</code> and confirms the payload agrees. Every month at or before that value is flagged in four places: the legend carries a caption naming the benchmark vintage in force and, for such months, a warning that it postdates the month; the detail panel repeats the warning beside the vintage line; every export row carries <code>weight_vintage</code> and <code>weights_anachronistic</code>, the header block carries an <code>anachronistic_weights</code> line, and the SVG and PNG captions carry the same sentence (<a href="#s6">§6</a>); and the validation report's event studies print a warning under every event dated in or before the first benchmark year. The remedy is data entry, not code: earlier benchmark cross-sections (WITS reaches back to the 1980s for most reporters) would extend the properly lagged range backwards one vintage at a time.</p>
+<h3 class="runin" id="s5-8"><span class="n">5.8</span>Channel discrimination — and whether the ranking moves</h3>
+<p>Two of the validation tests in <code>04_validate.py</code> bear on how the instrument may honestly be described, and their results are stated here rather than left in the report. Both use months from 2020-01, the first properly lagged vintage (<a href="#s5-7">§5.7</a>).</p>
+<p><em>T2 — are the sliders four channels?</em> Spearman correlation between channels over economy-months, rebased values: trade–CRM 0.922, trade–value added 0.937, CRM–value added 0.900; energy against the three of them 0.746–0.778; chokepoint against every other channel 0.20–0.29; mean off-diagonal 0.604. At a collinearity threshold of 0.9 the channels form <strong>three blocs, not four</strong>: trade / value added / CRM; energy; chokepoint. The CRM proxy is gross import shares of ores and metals, and those track gross import shares of everything; the value-added basis is, as intended, a re-measurement of the same trade channel. Energy and the chokepoint channel are the two the mix can actually move. The report names the pairs above the threshold each time it runs, so a future CRM construction that breaks the bloc will show up as a fourth.</p>
+<p><em>T4 — static structure or time series?</em> T1 (own-GPR versus Intensity over the same 80 months, mean cross-sectional Spearman 0.167 on the trade channel; 0.101 value added, 0.276 energy, 0.192 CRM, 0.185 chokepoint; own GPR read from the same source 03 built Intensity from) shows that the cross-section differs from source-side GPR. One per-economy figure in the chokepoint line deserves a sentence, because a reader of T1-per-channel may take it for a leak: Israel's own-GPR correlation with its chokepoint channel <em>rose</em> from 0.46 to 0.82 with the self-exclusion change, because its new Red Sea route (<a href="#s3-4">§3.4</a>) reads Egyptian and Saudi GPR, which co-moves with Israel's own — regional co-movement among littorals, not Israel's own series feeding back. T1 does not show that the cross-section <em>moves</em>: if <code>INT_i,t ≈ α_i + γ_t</code>, the month slider recolours a fixed dependency map by world risk and the monthly framing is not earned. T4 fits <code>y_it = μ + α_i + γ_t + ε_it</code> by two-way demeaning on the balanced panel (42 economies, 80 months) and reports variance shares, with thresholds fixed before the numbers were seen: residual below 0.10 static, 0.10–0.30 partly dynamic, above 0.30 substantial economy-specific variation; mean 12-month rank correlation above 0.90 means the ranking barely moves within a year.</p>
+<p>For the default-mix Intensity the residual share is <strong>0.138</strong> (economy effects 0.084, month effects 0.779; 0.095 in log10) — partly dynamic — and the mean Spearman between the cross-sectional ranking at <em>t</em> and at <em>t−12</em> is <strong>0.510</strong>: the ranking does move within a year. The small economy-effect share is expected rather than reassuring: rebasing centres every economy's series at 100 and removes between-economy level differences by construction, so the month factor absorbs most of the variance and the residual and the mobility are the informative figures. By channel: value added is the most global-factor-like (residual 0.051, month share 0.937, mobility 0.318); trade 0.105 and 0.480; CRM 0.173 and 0.399; energy the most economy-specific (residual 0.261, economy share 0.233, mobility 0.701). The <strong>chokepoint channel is the static one</strong>: economy effects carry 0.583 of its variance and its 12-month rank correlation is 0.963 — a fixed routing structure recoloured by littoral GPR, which is what a hand-coded route table applied to slow-moving trade weights should produce, and a reason to read the chokepoint layer as a map of who <em>would</em> be hit rather than as a monthly signal. On the full 1985–2026 sample, under the <a href="#s5-7">§5.7</a> caveat, the default-mix residual is 0.109 and the mobility 0.593; the chokepoint channel's mobility is 0.955.</p>
+<p>What this licenses: the monthly framing is earned for the mixed index and for the bilateral channels, partly — a material share of the month-to-month variation is economy-specific and the ranking turns over within a year — but the instrument is closer to "a dependency structure through which world risk is read" than to a set of independent national time series, and the chokepoint layer is structural. The interface's language should not outrun that. The figures the story page (<code>web/story.html</code>) quotes from T1, T2 and T4 are not typed there: <code>04_validate.py</code> writes them to <code>web/data/validation.json</code> alongside the report and the page reads that file at load, so they cannot go stale between monthly refreshes.</p>
+<hr class="rule">
+<h2 id="s6"><span class="n">6</span>Export contract</h2>
+<p>The interface offers two downloads: a <strong>cross-section</strong> (every exposed economy at the selected month) and a <strong>time series</strong> (one economy, all months), in CSV or JSON. Both share one column set, so the two shapes cannot drift apart:</p>
+<p><code>iso3, name, month, intensity, c_trade, c_va, c_energy, c_crm, c_choke, covered_trade, covered_va, covered_energy, covered_crm, covered_choke, weights_stale, weight_vintage, weights_anachronistic</code></p>
+<p><code>intensity</code> is the mixed index under the channel weights, normalisation and coverage mode in force when the file was written; <code>c_*</code> are the per-channel components <em>before</em> the mix, so a reader can re-derive <code>intensity</code> or re-weight it themselves. The <code>c_*</code> columns are emitted <strong>as displayed</strong>: with the coverage toggle on they are already divided by <code>covered_*</code>, so <code>intensity</code> re-derives from them in either mode, and the header says which mode produced the file. <code>weight_vintage</code> is the benchmark year each row's weights are joined to and <code>weights_anachronistic</code> is <code>true</code> where that benchmark postdates the row's month (<a href="#s5-7">§5.7</a>).</p>
+<p>A downloaded file leaves this interface and loses every caveat the panels carry, so each one opens with a header block (<code>#</code>-prefixed lines in CSV, a <code>meta</code> object in JSON) restating: the normalisation, the trade basis, the channel mix actually applied, the data vintage and download date, the lagged-benchmark weight rule and its pre-2020 fallback (<code>anachronistic_weights</code>: which months use the earliest benchmark and what they therefore measure), the coverage semantics below and the coverage mode in force (<code>coverage_normalisation</code>: <code>as observed</code>, or <code>per observed dependency</code> with a statement of which columns were divided), the not-a-forecast caution, and the Caldara–Iacoviello CC-BY citation. Attribution is a licence obligation, not a courtesy; <code>ribat-verify</code> fails if the header is stripped. The reverse-map exports carry the same <code>coverage_normalisation</code> key.</p>
+<p>The two panel charts — the Intensity series and the channel decomposition — export as standalone SVG. The page styles them with CSS custom properties and puts their key and caption in sibling elements, none of which survive the file leaving the page, so the export resolves the variables to literals and redraws the key, the normalisation, the weight-vintage rule, the stale-weight warning where it applies, the coverage mode, the anachronistic-weights warning where it applies, the not-a-forecast caution and the citation as text inside the figure. A chart that travels without its caveats is the failure mode <a href="#s5">§5</a> exists to prevent, so the figure is self-describing or it is not shipped.</p>
+<p>The cross-section is also available as <strong>GeoJSON</strong>, built from the boundary features the map already holds, so no second copy of the geometry ships and the polygons are exactly those on screen. Properties reuse the CSV column names. Two deviations are deliberate: attribution is repeated on every feature, because RFC 7946 parsers may drop the top-level <code>metadata</code> member and losing the licence line is not a cosmetic failure; and economies that Natural Earth carries as several features (Australia) are merged into one MultiPolygon, so a join cannot double-count them. There is no GeoJSON time series — the same polygon repeated across 500 months is not a useful artefact.</p>
+<p>The map is also exportable as <strong>PNG</strong>, as it appears. A bare canvas grab would be a picture of colours with no scale, so a footer composites the ramp with the break values actually displayed, the unit line, the channel mix, the coverage mode and anachronism warning where they apply, the not-a-forecast caution and the citation; the footer sizes itself to the wrapped text so nothing is clipped at any capture width. Reading pixels back from a WebGL canvas requires <code>preserveDrawingBuffer</code>, which costs memory on every page load whether or not anyone exports — a standing charge accepted for this convenience, and the reason the PNG was the last of the export formats to be built rather than the first.</p>
+<p><strong>Why <code>covered_choke</code> is always empty.</strong> For trade, value added, energy and raw materials, <code>covered_*</code> is the share of that channel's <em>denominator</em> observed by the GPR-44 source set — a genuine fraction of a measured flow. The chokepoint weight has no such denominator: it is a routing indicator derived from a coarse hand-coded route table (<a href="#s3-4">§3.4</a>), not a share of observed trade. Emitting a number in that column would invite a comparison the construction does not support, so the column is written blank and the header states the reason; for the same reason the coverage toggle of <a href="#s5-4">§5.4</a> leaves <code>c_choke</code> untouched. The channel understates by construction, most severely at Hormuz, whose true littorals are almost entirely outside the GPR set. This is a documented absence, not a gap in the pipeline.</p>
+<hr class="rule">
+<h2 id="s7"><span class="n">7</span>Attribution</h2>
+<p>GPR data are open access under Creative Commons BY. Required citation:</p>
+<blockquote>Caldara, Dario and Matteo Iacoviello (2022), "Measuring Geopolitical Risk," <em>American Economic Review</em>, 112(4), pp. 1194–1225.</blockquote>
+<blockquote>Caldara, Dario, Sarah Conlisk, Matteo Iacoviello and Maddie Penn (2023), "Do Geopolitical Risks Raise or Lower Inflation?" (extends country coverage to 44 countries).</blockquote>
+<p>Data downloaded from <a href="https://www.matteoiacoviello.com/gpr.htm">https://www.matteoiacoviello.com/gpr.htm</a> on 31 August 2026.</p>
+<p>Note for the record: Iacoviello and Tong (2026) published the <strong>AI-GPR Index</strong> (<a href="https://www.matteoiacoviello.com/research_files/AI_GPR_PAPER.pdf">https://www.matteoiacoviello.com/research_files/AI_GPR_PAPER.pdf</a>), which applies GPT-4o mini to about 4.6 million <em>New York Times</em>, <em>Washington Post</em> and <em>Chicago Tribune</em> articles, 1960–2025, producing graded rather than binary risk scores. The paper contains country-level and directed country-pair decompositions; whether the country series are publicly released is unconfirmed. Should they be, they substitute directly for <code>G_j,t</code> in the formula above with no change to the exposure framework — and the directed pairs would, for the first time, allow a source-side bilateral <code>G_j→i,t</code> in place of the country-level <code>G_j,t</code>.</p>
+<p>The map referred to in <a href="#s1">§1</a> and <a href="#s4">§4</a> is Jamel Saadaoui, "Drawing an Interactive Map for the Geopolitical Risks with Jupyter", 3 November 2025, <a href="https://www.jamelsaadaoui.com/drawing-an-interactive-map-for-the-geopolitical-risks-with-jupyter/">https://www.jamelsaadaoui.com/drawing-an-interactive-map-for-the-geopolitical-risks-with-jupyter/</a>, which maps the January–September 2025 mean of country GPR rebased to the 1985–2023 mean = 100.</p>
+      <a class="cta" href="./index.html">Open the map →</a>
+    </article>
+  </div>
+
+</main>
+
+<footer>
+  <p><strong style="color:var(--bone-2)">Risk data</strong>: Caldara, D. &amp;
+    Iacoviello, M. (2022), “Measuring Geopolitical Risk”, <em>American Economic
+    Review</em> 112(4), 1194–1225. CC BY.
+    <strong style="color:var(--bone-2)">Dependency weights</strong>: UN Comtrade
+    via World Bank WITS; OECD TiVA.
+    <strong style="color:var(--bone-2)">Boundaries</strong>: Natural Earth,
+    public domain.</p>
+  <p>Generated by <code>pipeline/05_render_method.py</code> from
+    <code>METHODOLOGY.md</code> (draft v0.2, 2 September 2026;
+    source sha256 <code>88d821143bee</code>). The text is licensed CC BY 4.0; the code is MIT.
+    Bug reports, data requests and methodology questions:
+    <a href="https://github.com/Sam0urr/ribat/issues/new/choose">open an issue</a>.
+    <a href="https://github.com/Sam0urr/ribat">Source, methodology and replication files</a>.</p>
+</footer>
+</body>
+</html>

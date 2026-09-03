@@ -23,16 +23,16 @@ there and, where it affects reading the map, surfaced in the interface.
 ## Invariants — do not undo these
 
 1. **No build step.** `web/index.html` is one hand-readable file. No React, no
-   bundler, no npm, no new runtime dependencies. Everything the two pages load
-   is vendored: every payload and the country polygons ship under `web/data/`,
-   and the two libraries (MapLibre GL JS, topojson-client) and the story
+   bundler, no npm, no new runtime dependencies. Everything the three pages
+   (map, story, method) load is vendored: every payload and the country
+   polygons ship under `web/data/`, and the two libraries (MapLibre GL JS, topojson-client) and the story
    page's typefaces (Fraunces, IBM Plex Sans, IBM Plex Mono) ship under
    `web/vendor/` with a hash manifest (`web/vendor/MANIFEST.json`), so the
    published site makes **zero third-party requests at runtime** — no CDN, no
    font service, no tile server, API or tracker. Upgrade a library or a font
    by replacing the vendored file and its manifest entry (bytes and sha256),
    never by reintroducing a CDN or Google Fonts tag; the verifier fails on any
-   `http(s)://` script, stylesheet, preconnect, `@import` or `url()` in either
+   `http(s)://` script, stylesheet, preconnect, `@import` or `url()` in any
    page. Do not add a third library.
 2. **MapLibre GL JS, never Mapbox GL JS.** Documented in README (token,
    billing, reviewer dependency). Do not "upgrade" back.
@@ -87,7 +87,17 @@ Order is load-bearing:
 02c_build_va_weights.py       OECD TiVA value-added weights (cached, rarely re-run)
 03_build_intensity.py         join GPR x weights -> web/data/intensity.json
 04_validate.py                discriminant / channel / event-study tests
+05_render_method.py           METHODOLOGY.md -> web/method.html (typeset copy)
 ```
+
+`web/method.html` is generated, never hand-edited. It embeds the sha256 of the
+METHODOLOGY.md it was rendered from and the verifier fails when that no longer
+matches, so every edit to METHODOLOGY.md is followed by
+`python3 pipeline/05_render_method.py`. The renderer is standard library only
+and handles the Markdown subset the document uses; a construct it does not
+know renders as plain text rather than failing, so look at the page after
+adding one. The refresh workflow does not run 05: the method does not change
+monthly.
 
 Monthly refresh (`.github/workflows/refresh.yml`) re-runs only 01 → 03 → 04.
 Change detection hashes `{months, countries}` — never file bytes, which differ
@@ -114,13 +124,15 @@ Python compilation, inline-JS syntax, payload contract, coverage counts,
 banned-token residue, licence presence, the vendored assets (every file under
 `web/vendor/` listed in `MANIFEST.json` with its recorded byte count and
 sha256, every licence file present, and no `http(s)://` script, stylesheet,
-preconnect, `@import` or `url()` in either page), the export contract
+preconnect, `@import` or `url()` in any page), the export contract
 (CSV/JSON header,
 SVG and GeoJSON), the reverse map's disclosures, the README provenance digest,
 the 01/03 pipeline regression guards, the map export contract (PNG back
 buffer), map coverage (every payload economy reaches a paintable feature), and
 the methods-review contract, including the validation summary
-(`web/data/validation.json` against the report, and the story page's hooks).
+(`web/data/validation.json` against the report, and the story page's hooks),
+and the method page (rendered from the current METHODOLOGY.md, every numbered
+section anchored, no script, the story linking it locally, issue forms present).
 
 After changing 03 or the payload schema: bump/keep `kind` consistent with the
 front end's loader (`web/index.html` reads `kind` to choose render paths), and
