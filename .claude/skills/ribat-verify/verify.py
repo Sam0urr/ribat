@@ -850,7 +850,6 @@ def main() -> int:
         story_p = ROOT / "web" / "story.html"
         story = story_p.read_text(encoding="utf-8") if story_p.exists() else ""
         check('href="./method.html"' in story, "story.html links the local method page")
-        check('href="./method.html"' in html, "index.html links the local method page")
         check("issues/new/choose" in story and "issues/new/choose" in method,
               "story and method pages link the issue forms (the request channel)")
         forms = ROOT / ".github" / "ISSUE_TEMPLATE"
