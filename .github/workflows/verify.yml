@@ -1,13 +1,19 @@
-# Runs the pre-commit verification on every push and pull request. The checks
-# in .claude/skills/ribat-verify/verify.py only bound the machine that
-# remembered to run them by hand; running them here binds the repository, which
-# is the point of writing an invariant down rather than a convention.
+# Runs the pre-commit verification on every pull request, and — via
+# workflow_call from pages.yml — on every push to main before the site is
+# published. The checks in .claude/skills/ribat-verify/verify.py only bound the
+# machine that remembered to run them by hand; running them here binds the
+# repository, which is the point of writing an invariant down rather than a
+# convention.
+#
+# There is deliberately no `push: branches: [main]` trigger. pages.yml calls
+# this workflow as the gate on deployment, so a push trigger here would run the
+# same checks a second time on the same commit, and the two runs would fight
+# over the concurrency group below and cancel each other.
 name: Verify
 
 on:
-  push:
-    branches: [main]
   pull_request:
+  workflow_call:
   workflow_dispatch:
 
 permissions:

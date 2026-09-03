@@ -19,7 +19,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gate. Publishing used to race the checks: both workflows started on the
+  # same push and never spoke, so a commit that failed verification still went
+  # live and the red X arrived afterwards, next to a broken map. Calling
+  # verify.yml rather than repeating its steps keeps one definition of
+  # "verified", and runs it against this exact commit.
+  verify:
+    uses: ./.github/workflows/verify.yml
+
+  # When the gate fails this job is skipped, no artifact is uploaded, and the
+  # previously deployed site stays up untouched. A failed build publishes
+  # nothing rather than publishing something wrong.
   deploy:
+    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: github-pages
