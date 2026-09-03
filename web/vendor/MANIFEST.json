@@ -1,0 +1,215 @@
+{
+ "generated": "2026-09-03",
+ "purpose": "Every third-party runtime asset the two pages under web/ load, vendored so the published site makes zero third-party requests. Upgrade by replacing a file and its entry here (bytes and sha256), never by a CDN or Google Fonts tag. verify.py checks each entry byte-for-byte and fails on unlisted files.",
+ "notes": {
+  "source_maps": "maplibre-gl-5.24.0.js ends with a relative '//# sourceMappingURL=maplibre-gl.js.map' comment (its last line). The map is not vendored: a browser only requests it with developer tools open, and then gets a same-origin 404; no request leaves the site. The CSS contains only data: URIs (its http://www.w3.org/2000/svg strings are XML namespaces inside them) and the JS carries no absolute http(s) URL that is fetched at runtime — its literals are the maplibre.org homepage and licence link in the banner and an upstream issue link in a comment. Library bytes are upstream's, unmodified, so each sha256 can be recomputed against the source_url.",
+  "font_subsets": "The story page's visible text lies within Google's 'latin' block (U+0000-00FF, U+2000-206F and a few others) except for the two marked letters of 'Ribāṭ' (U+0101, U+1E6D), which 'latin-ext' covers, and one rightwards arrow (U+2192), which no Google subset covers and which therefore falls through to the fallback font exactly as it did when served by Google. Hence latin and latin-ext are vendored for every family, style and weight; cyrillic, cyrillic-ext, greek and vietnamese are dropped. Google served one identical file for IBM Plex Sans 300, 400, 500 and 600 (same sha256), so those four @font-face declarations share one vendored file per subset.",
+  "user_agent": "The CSS2 endpoint was fetched with a Chrome 128 user agent; without one Google returns TTF faces and no unicode-range."
+ },
+ "total_bytes": 1574561,
+ "files": [
+  {
+   "path": "web/vendor/maplibre-gl-5.24.0.js",
+   "source_url": "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.js",
+   "version": "maplibre-gl 5.24.0 (what the unpinned @5 tag resolved to on the fetch date)",
+   "bytes": 1056837,
+   "sha256": "45a9b07a9189ce56054c620a947ccf41e291e58c95e9b61533b740aaa65ee5cb",
+   "licence": "BSD-3-Clause",
+   "licence_file": "web/vendor/maplibre-gl-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/maplibre-gl-5.24.0.css",
+   "source_url": "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/dist/maplibre-gl.css",
+   "version": "maplibre-gl 5.24.0",
+   "bytes": 70024,
+   "sha256": "ab1e70d59ec40465bae7e7030da2f3ccf28133fd502e62bd598eefbadfd7a732",
+   "licence": "BSD-3-Clause",
+   "licence_file": "web/vendor/maplibre-gl-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/maplibre-gl-LICENSE.txt",
+   "source_url": "https://cdn.jsdelivr.net/npm/maplibre-gl@5.24.0/LICENSE.txt",
+   "version": "maplibre-gl 5.24.0",
+   "bytes": 5984,
+   "sha256": "ee5fc05a0677eaf69601d2c7db0d9ecd6cc27c3abc1d0733bc9ed34707cf8ef2",
+   "licence": "BSD-3-Clause (licence text)",
+   "licence_file": "web/vendor/maplibre-gl-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/topojson-client-3.1.0.min.js",
+   "source_url": "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js",
+   "version": "topojson-client 3.1.0 (what the unpinned @3 tag resolved to on the fetch date)",
+   "bytes": 7169,
+   "sha256": "25cd02ae486cc5063e0215a4e4cfb15de83700c87ac48bac4d57dc6aaf3ebb89",
+   "licence": "ISC",
+   "licence_file": "web/vendor/topojson-client-LICENSE",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/topojson-client-LICENSE",
+   "source_url": "https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/LICENSE",
+   "version": "topojson-client 3.1.0",
+   "bytes": 734,
+   "sha256": "4c4d15b635e04e691825a76db7d33f7f2033b55669a7430011694f31e6c65999",
+   "licence": "ISC (licence text)",
+   "licence_file": "web/vendor/topojson-client-LICENSE",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts.css",
+   "source_url": "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap",
+   "version": "generated 2026-09-03 from the Google Fonts CSS2 response (Chrome user agent), latin and latin-ext blocks only, src rewritten to ./fonts/",
+   "bytes": 9522,
+   "sha256": "9dd920f28d00968031c9b464024ebc92cf5aaf15ae6b4ed39a6ae180a4b99ba4",
+   "licence": "OFL-1.1 (the declarations describe OFL typefaces; the file is derived from Google's generated stylesheet)",
+   "licence_file": [
+    "web/vendor/fonts/Fraunces-OFL.txt",
+    "web/vendor/fonts/IBM-Plex-LICENSE.txt"
+   ],
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/Fraunces-italic-300-900-latin-ext.woff2",
+   "source_url": "https://fonts.gstatic.com/s/fraunces/v38/6NU58FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChjdPeQ7ZXk8kD6.woff2",
+   "version": "Fraunces via Google Fonts API, font version v38; italic 300–900, subset latin-ext",
+   "bytes": 71568,
+   "sha256": "1e0d114a72921799f06413d3673a80c316fa77d8d344df6de7c8659302ece2dc",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/Fraunces-OFL.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/Fraunces-italic-300-900-latin.woff2",
+   "source_url": "https://fonts.gstatic.com/s/fraunces/v38/6NU58FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChjeveQ7ZXk8g.woff2",
+   "version": "Fraunces via Google Fonts API, font version v38; italic 300–900, subset latin",
+   "bytes": 81704,
+   "sha256": "4af9c759c8059b53923b4b50ba377ba51029876e1af1ea757efb07bc67d97896",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/Fraunces-OFL.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/Fraunces-normal-300-900-latin-ext.woff2",
+   "source_url": "https://fonts.gstatic.com/s/fraunces/v38/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxCFTeP2Xz5fU8w.woff2",
+   "version": "Fraunces via Google Fonts API, font version v38; normal 300–900, subset latin-ext",
+   "bytes": 59540,
+   "sha256": "f120089b9440f3e35a980a2137347b1851ad46ee4b8ad5c63b6c07e053fa40e2",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/Fraunces-OFL.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/Fraunces-normal-300-900-latin.woff2",
+   "source_url": "https://fonts.gstatic.com/s/fraunces/v38/6NU78FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0KxC9TeP2Xz5c.woff2",
+   "version": "Fraunces via Google Fonts API, font version v38; normal 300–900, subset latin",
+   "bytes": 67388,
+   "sha256": "48282a415ec22e31beaf0a0666e6fae0c8cbddcd0b1f6e729f27c3ade8a64e43",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/Fraunces-OFL.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/IBMPlexMono-normal-400-latin-ext.woff2",
+   "source_url": "https://fonts.gstatic.com/s/ibmplexmono/v20/-F63fjptAgt5VM-kVkqdyU8n1iEq131nj-otFQ.woff2",
+   "version": "IBM Plex Mono via Google Fonts API, font version v20; normal 400, subset latin-ext",
+   "bytes": 8860,
+   "sha256": "f1050dc5317b43434c0aeda599d4624c774ffc162e87a8cf204b949b6a85816d",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/IBM-Plex-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/IBMPlexMono-normal-400-latin.woff2",
+   "source_url": "https://fonts.gstatic.com/s/ibmplexmono/v20/-F63fjptAgt5VM-kVkqdyU8n1i8q131nj-o.woff2",
+   "version": "IBM Plex Mono via Google Fonts API, font version v20; normal 400, subset latin",
+   "bytes": 10052,
+   "sha256": "c36f509c0a8f9f85f29cb44bc8701d8a9e0b14c499e77a884f789ead7093a7ac",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/IBM-Plex-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/IBMPlexMono-normal-500-latin-ext.woff2",
+   "source_url": "https://fonts.gstatic.com/s/ibmplexmono/v20/-F6qfjptAgt5VM-kVkqdyU8n3twJwl5FgsAXHNlYzg.woff2",
+   "version": "IBM Plex Mono via Google Fonts API, font version v20; normal 500, subset latin-ext",
+   "bytes": 8848,
+   "sha256": "77f03e26f981c582bdba3a7abed4baa2d3149211c01366bb3ab3ba7622ec4ae5",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/IBM-Plex-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/IBMPlexMono-normal-500-latin.woff2",
+   "source_url": "https://fonts.gstatic.com/s/ibmplexmono/v20/-F6qfjptAgt5VM-kVkqdyU8n3twJwlBFgsAXHNk.woff2",
+   "version": "IBM Plex Mono via Google Fonts API, font version v20; normal 500, subset latin",
+   "bytes": 10060,
+   "sha256": "a76f53ca6612e7b3828eec2311098675b7f9849ae4169a8bcef6302aec02a6c0",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/IBM-Plex-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/IBMPlexSans-italic-400-latin-ext.woff2",
+   "source_url": "https://fonts.gstatic.com/s/ibmplexsans/v23/zYXEKVElMYYaJe8bpLHnCwDKhdTEG46kmUZQCX598fQbM4jw8V78x9OWIhqbQ5g0voKE7-jfBVSl7w.woff2",
+   "version": "IBM Plex Sans via Google Fonts API, font version v23; italic 400, subset latin-ext",
+   "bytes": 12032,
+   "sha256": "f0d521828c0d91f2857f001f0ede42adb7b2c12520b00f1cbc1af16ae4fa1eeb",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/IBM-Plex-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/IBMPlexSans-italic-400-latin.woff2",
+   "source_url": "https://fonts.gstatic.com/s/ibmplexsans/v23/zYXEKVElMYYaJe8bpLHnCwDKhdTEG46kmUZQCX598fQbM4jw8V78x9OWIhqbQ5g6voKE7-jfBVQ.woff2",
+   "version": "IBM Plex Sans via Google Fonts API, font version v23; italic 400, subset latin",
+   "bytes": 19284,
+   "sha256": "134dc0ee94e70cf5d52f608a7ac4b864c9b00bdf69779b8919712ce89da253b1",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/IBM-Plex-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/IBMPlexSans-normal-300-600-latin-ext.woff2",
+   "source_url": "https://fonts.gstatic.com/s/ibmplexsans/v23/zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxQKYbSB4ZhRNU.woff2",
+   "version": "IBM Plex Sans via Google Fonts API, font version v23; normal 300–600, subset latin-ext",
+   "bytes": 25868,
+   "sha256": "ae1d854fefa1167a79071f1afe01d4d51b60c5840c1be36dd74bd5fe7375b405",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/IBM-Plex-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/IBMPlexSans-normal-300-600-latin.woff2",
+   "source_url": "https://fonts.gstatic.com/s/ibmplexsans/v23/zYXzKVElMYYaJe8bpLHnCwDKr932-G7dytD-Dmu1syxeKYbSB4Zh.woff2",
+   "version": "IBM Plex Sans via Google Fonts API, font version v23; normal 300–600, subset latin",
+   "bytes": 40240,
+   "sha256": "056e4e2459f57a0033c8c9c844ff19d6e42ac8602027803d4345823bcc939818",
+   "licence": "OFL-1.1",
+   "licence_file": "web/vendor/fonts/IBM-Plex-LICENSE.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/Fraunces-OFL.txt",
+   "source_url": "https://raw.githubusercontent.com/undercasetype/Fraunces/master/OFL.txt",
+   "version": "Fraunces repository, master on the fetch date",
+   "bytes": 4391,
+   "sha256": "bdf4c22802eaf804f998195871c6b8938aac2ac14b2d78a8bd66a6f1eced833b",
+   "licence": "OFL-1.1 (licence text)",
+   "licence_file": "web/vendor/fonts/Fraunces-OFL.txt",
+   "fetched": "2026-09-03"
+  },
+  {
+   "path": "web/vendor/fonts/IBM-Plex-LICENSE.txt",
+   "source_url": "https://raw.githubusercontent.com/IBM/plex/master/LICENSE.txt",
+   "version": "IBM Plex repository, master on the fetch date",
+   "bytes": 4456,
+   "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+   "licence": "OFL-1.1 (licence text)",
+   "licence_file": "web/vendor/fonts/IBM-Plex-LICENSE.txt",
+   "fetched": "2026-09-03"
+  }
+ ]
+}
