@@ -255,14 +255,21 @@
   <div class="row"><label for="wEnergy">Energy</label><input type="range" id="wEnergy" min="0" max="100" value="25"><output id="oEnergy">25</output></div>
   <div class="row"><label for="wCrm">Raw mat.</label><input type="range" id="wCrm" min="0" max="100" value="10"><output id="oCrm">10</output></div>
   <div class="row"><label for="wChoke">Chokepoint</label><input type="range" id="wChoke" min="0" max="100" value="10"><output id="oChoke">10</output></div>
-  <p class="note">Weights renormalise to sum to 1. There is no correct fixed weighting — move them and read the result as a sensitivity analysis, not a ranking.</p>
+  <p class="note">Weights renormalise to sum to 1. There is no correct fixed weighting — move them and read the result as a sensitivity analysis, not a ranking. The default (55 / 25 / 10 / 10) is an illustrative starting point, not a derived weighting.</p>
 
   <h2 id="basisHead">Trade weight basis</h2>
   <div class="seg" role="group" id="basisSeg">
     <button id="btnGross" aria-pressed="true">Gross trade</button>
     <button id="btnVA" aria-pressed="false">Value added</button>
   </div>
-  <p class="note" id="basisNote">Gross: bilateral goods flows (Comtrade). Value added: origin of value added in final demand (OECD TiVA) — looks through third countries, so exposure routed via intermediaries is attributed to its true origin.</p>
+  <p class="note" id="basisNote">Gross: bilateral goods flows (Comtrade). Value added: origin of the value added embodied in this economy's final demand (OECD TiVA FDVA). It looks through third countries, but it measures what this economy's consumers and investors ultimately absorb, finished goods included — not what its producers use as inputs (METHODOLOGY §5.2).</p>
+
+  <h2 id="covHead">Coverage</h2>
+  <div class="seg" role="group" id="covSeg">
+    <button id="btnCovRaw" aria-pressed="true">As observed</button>
+    <button id="btnCovNorm" aria-pressed="false">Per observed dependency</button>
+  </div>
+  <p class="note" id="covNote">As observed: each channel is its covered share × the mean partner GPR over the partners GPR observes, so a thinly covered economy ranks low for a coverage reason, not an exposure one. Per observed dependency divides each channel by its covered share (chokepoint has no coverage measure and is unchanged); this removes the confound but amplifies noise where coverage is thin — energy coverage falls to 0.09 (METHODOLOGY §5.4).</p>
 
   <h2>Projection</h2>
   <div class="seg" role="group">
@@ -291,6 +298,7 @@
   <div class="ticks" id="ticks"></div>
   <div class="legend-unit" id="legendUnit">—</div>
   <p class="cap" id="currency">—</p>
+  <p class="cap" id="vintageNote" hidden></p>
   <p class="cap">Boundaries: Natural Earth (public domain). GPR: Caldara &amp; Iacoviello (2022), CC-BY.</p>
 </div>
 </div>
@@ -327,6 +335,11 @@ const state = {
   months: [], idx: 0, mode: 'rebased', selected: null,
   weights: { trade: 55, energy: 25, crm: 10, choke: 10 },
   data: null, placeholder: true, kind: 'intensity', basis: 'trade', exportFmt: 'csv',
+  // covnorm: false = "as observed" (channel value is covered_share x mean
+  // partner GPR over the observed partners); true = divide each channel by its
+  // covered share. Raw is the default because division amplifies noise where
+  // coverage is thin (METHODOLOGY 5.4).
+  covnorm: false,
   view: 'exposure', rev: { weights: null, gpr: null, error: null, pending: null }
 };
 
@@ -357,6 +370,7 @@ async function loadData() {
       } else {
         b.style.display = 'none';
       }
+      hideCoverageToggleUnlessMulti();
       const cur = document.getElementById('currency');
       if (cur) cur.textContent = `Data through ${d.months[d.months.length - 1]}`
         + (d.generated ? ` · built ${d.generated}` : '')
@@ -365,7 +379,17 @@ async function loadData() {
     }
   } catch (_) { /* fall through to synthetic */ }
   document.getElementById('banner').textContent = 'PLACEHOLDER DATA — synthetic values for layout only. Run pipeline/01_load_gpr.py.';
+  hideCoverageToggleUnlessMulti();
   return synthetic();
+}
+
+// The coverage toggle divides per-channel values by their covered share. Only
+// the multi-channel payload carries one; for every other kind (trade-only,
+// source-side GPR, the synthetic placeholder) the buttons would be inert, so
+// they are hidden in one place rather than per branch.
+function hideCoverageToggleUnlessMulti() {
+  if (state.kind === 'intensity_multi') return;
+  for (const id of ['covHead','covSeg','covNote']) document.getElementById(id).style.display = 'none';
 }
 
 // Deterministic pseudo-random so the placeholder is stable across reloads.
@@ -393,17 +417,76 @@ function synthetic() {
 
 function intensity(iso) { return intensityAt(iso, state.idx); }
 
+// ---------------------------------------------------------------------------
+// Coverage normalisation. The pipeline restricts each channel's numerator to
+// the GPR-44 partners and keeps the world total as denominator, so
+//   sum_j w_ij = covered_share_i   and   channel_i,t = covered_i x E[G_j,t | observed partners].
+// Two economies with identical partner risk but coverage 0.9 and 0.5 therefore
+// differ 1.8x, and the map ranks by percentile. "Per observed dependency"
+// divides the covered share back out. Chokepoint has no coverage measure (a
+// routing indicator, not a share of observed flow) and is never divided.
+// ---------------------------------------------------------------------------
+/* The divisor a channel value is shown under. 1 unless the toggle is on, the
+   channel is not chokepoint and a positive covered share exists. attribution()
+   uses the same function, which is what keeps sum_j contributions equal to the
+   channel value intensityAt() is built from. */
+function covDivisor(rec, ch) {
+  const cov = rec?.covered?.[ch];
+  return (state.covnorm && ch !== 'choke' && cov > 0) ? cov : 1;
+}
+
+/* Channel value for one economy at month i, on the current normalisation and
+   under the current coverage mode. null where the channel has no value. */
+function chanVal(rec, ch, i) {
+  const v = rec?.[state.mode]?.[ch]?.[i];
+  if (v == null || Number.isNaN(v)) return null;
+  return v / covDivisor(rec, ch);
+}
+
+/* Weight vintage for a month from the payload's own benchmark list: the latest
+   benchmark strictly before the month's year, else the earliest. Mirrors
+   weight_year_for in pipeline/03 (and weightYear() below, which reads the
+   lazily fetched weights.json - this one must work before that arrives). */
+function vintageFor(month) {
+  const ys = state.data?.weight_years;
+  if (!Array.isArray(ys) || !ys.length || !month) return null;
+  const y = +String(month).slice(0, 4);
+  const prior = ys.filter(a => a < y);
+  return String(prior.length ? Math.max.apply(null, prior) : Math.min.apply(null, ys));
+}
+
+/* Months up to weights_anachronistic_through carry a benchmark that postdates
+   them (the pre-2020 fallback, METHODOLOGY 5.7). YYYY-MM strings compare
+   lexically, so <= is a date comparison. */
+function isAnachronistic(month) {
+  const th = state.data?.weights_anachronistic_through;
+  return typeof th === 'string' && !!month && String(month) <= th;
+}
+
+function anachronismTail(vintage) {
+  return `exposure under the ${vintage} structure, not the structure of the time (METHODOLOGY §5.7)`;
+}
+
+/* Panel caption used by both detail views, so the two cannot disagree. */
+function vintageCaptionHTML(vintage, month) {
+  if (vintage == null) return '';
+  return `<p class="cap">Dependency weights: ${vintage} benchmark vintage, applied to ${month} GPR`
+    + (isAnachronistic(month)
+        ? `<span style="color:var(--warn)"> — a month it postdates: ${anachronismTail(vintage)}</span>` : '')
+    + `.</p>`;
+}
+
 /* Same computation at an arbitrary month index, so the detail panel can
    draw a full series without duplicating the mix logic. */
 function intensityAt(iso, i) {
   const rec = state.data.countries[iso];
   if (!rec) return null;
   if (state.kind === 'intensity_multi') {
-    const w = state.weights, series = rec[state.mode];
+    const w = state.weights;
     let num = 0, den = 0;
     for (const [ch, wt] of [[state.basis, w.trade], ['energy', w.energy], ['crm', w.crm], ['choke', w.choke]]) {
-      const v = series[ch]?.[i];
-      if (v == null || Number.isNaN(v)) continue;
+      const v = chanVal(rec, ch, i);
+      if (v == null) continue;
       num += v * wt; den += wt;
     }
     return den > 0 ? num / den : null;
@@ -520,7 +603,7 @@ function attribution(iso, i) {
   const W = state.rev.weights, G = state.rev.gpr;
   const wRec = W.w[iso], rec = state.data.countries[iso];
   if (!wRec || !rec) return null;
-  const series = rec[state.mode] || {}, th = state.weights;
+  const th = state.weights;
   const yr = weightYear(state.months[i]);
   const attributable = [[state.basis, th.trade], ['energy', th.energy], ['crm', th.crm]];
 
@@ -530,8 +613,7 @@ function attribution(iso, i) {
   // of the page is showing.
   let den = 0;
   for (const [ch, wt] of attributable.concat([['choke', th.choke]])) {
-    const v = series[ch] && series[ch][i];
-    if (v == null || Number.isNaN(v)) continue;
+    if (chanVal(rec, ch, i) == null) continue;
     den += wt;
   }
   if (!(den > 0)) return null;
@@ -540,23 +622,27 @@ function attribution(iso, i) {
   let attributed = 0;
   for (const [ch, wt] of attributable) {
     if (!wt) continue;
-    const v = series[ch] && series[ch][i];
-    if (v == null || Number.isNaN(v)) continue;       // channel absent for this economy
+    if (chanVal(rec, ch, i) == null) continue;        // channel absent for this economy
     const blk = wRec[ch] && wRec[ch][yr];
     if (!blk) continue;
+    // Under "per observed dependency" the channel value on screen is
+    // sum_j w_ij G_j / covered, so each source's slice is divided by the same
+    // covered share: sum_j of these is wt * chanVal / den, the channel's exact
+    // contribution to intensityAt. Chokepoint's divisor is always 1.
+    const cov = covDivisor(rec, ch);
     for (const pair of blk) {
       const sIso = W.sources[pair[0]], g = G.countries[sIso];
       const gv = g && g[state.mode] && g[state.mode][i];
       if (gv == null || Number.isNaN(gv)) continue;
-      const c = wt * pair[1] * gv / den;
+      const c = wt * pair[1] * gv / cov / den;
       let e = by.get(sIso);
       if (!e) { e = { iso: sIso, total: 0, ch: {} }; by.set(sIso, e); }
       e.total += c; e.ch[ch] = (e.ch[ch] || 0) + c;
       attributed += c;
     }
   }
-  const ckv = series.choke && series.choke[i];
-  const residual = (ckv == null || Number.isNaN(ckv)) ? 0 : th.choke * ckv / den;
+  const ckv = chanVal(rec, 'choke', i);
+  const residual = ckv == null ? 0 : th.choke * ckv / den;
   const total = intensityAt(iso, i);
   const rows = Array.from(by.values()).sort((a, b) => b.total - a.total);
   const shares = new Map();
@@ -577,7 +663,7 @@ let revCache = null;
 function currentAttribution() {
   if (!reverseActive()) return null;
   const w = state.weights;
-  const key = [state.selected, state.idx, state.mode, state.basis,
+  const key = [state.selected, state.idx, state.mode, state.basis, state.covnorm,
                w.trade, w.energy, w.crm, w.choke].join('|');
   if (!revCache || revCache.key !== key) revCache = { key: key, val: attribution(state.selected, state.idx) };
   return revCache.val;
@@ -698,8 +784,32 @@ function legendModel(sorted, attr) {
     out.push(sorted[idx]);
   }
   const what = state.kind === 'gpr_source_side' ? 'GPR' : 'Intensity';
+  // The unit line must say which coverage mode produced the bins: the two
+  // modes rank the same economies differently (rank correlation 0.74 on the
+  // payload at the methods review; METHODOLOGY 5.4), so a
+  // legend that did not name the mode would be silently ambiguous.
+  if (state.covnorm && state.kind === 'intensity_multi') {
+    return { breaks: out, anchor: null,
+             unit: `Intensity per observed dependency (${state.mode}) · percentile bins, breaks for ${state.months[state.idx]}` };
+  }
   return { breaks: out, anchor: null,
            unit: `${what} (${state.mode}) · percentile bins, breaks for ${state.months[state.idx]}` };
+}
+
+/* Legend caption: which benchmark vintage the month on screen is joined to, and
+   a warning when that benchmark postdates the month (METHODOLOGY 5.7). Built
+   from weight_years in the payload, never from the lazily fetched weights.json,
+   so it is correct from the first frame. */
+function updateVintageNote() {
+  const el = document.getElementById('vintageNote');
+  if (!el) return;
+  const month = state.months[state.idx];
+  const v = state.kind === 'intensity_multi' ? vintageFor(month) : null;
+  if (v == null) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = `Weights: ${v} benchmark`
+    + (isAnachronistic(month)
+        ? `<span style="color:var(--warn)">, applied to a month it postdates — ${anachronismTail(v)}</span>` : '');
 }
 
 function updateLegend(sorted, attr) {
@@ -731,7 +841,8 @@ function updateSrTable(rows, attr) {
       + `</tbody></table>`;
     return;
   }
-  const label = state.kind === 'gpr_source_side' ? 'GPR' : 'Intensity';
+  const label = state.kind === 'gpr_source_side' ? 'GPR'
+    : (state.covnorm && state.kind === 'intensity_multi') ? 'Intensity per observed dependency' : 'Intensity';
   document.getElementById('srTable').innerHTML =
     `<table><caption>${label} (${state.mode}) by economy, ${state.months[state.idx]}. `
     + `${rows.length} economies, ranked highest first.</caption>`
@@ -778,6 +889,7 @@ function render() {
   }
   document.getElementById('monthLabel').textContent = state.months[state.idx] || '—';
   updateLegend(sorted, attr);
+  updateVintageNote();
   updateSrTable(world.features.map(f => f.properties.iso3).filter(Boolean)
     .map(i => ({ i, v: intensity(i) })).filter(o => o.v != null)
     .sort((a, b) => b.v - a.v), attr);
@@ -848,7 +960,7 @@ function sparkSVG(iso) {
   const mark = `<line x1="${cx}" y1="${P}" x2="${cx}" y2="${H - P}" stroke="var(--muted)" opacity=".55"/>`
     + (cur != null ? `<circle cx="${cx}" cy="${Y(cur).toFixed(1)}" r="2.6" fill="var(--accent)"/>` : '');
   const f = v => state.mode === 'rebased' ? v.toFixed(0) : v.toFixed(3);
-  const alt = `${NAMES[iso] || iso} Intensity from ${state.months[0]} to ${state.months[n - 1]}, `
+  const alt = `${NAMES[iso] || iso} Intensity${state.covnorm ? ' per observed dependency' : ''} from ${state.months[0]} to ${state.months[n - 1]}, `
     + `${state.mode} basis: low ${f(min)}, high ${f(max)}, `
     + `${state.months[state.idx]} ${cur == null ? 'unavailable' : f(cur)}.`;
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${alt}">`
@@ -867,7 +979,7 @@ function sparkSVG(iso) {
 function stackSVG(iso) {
   const rec = state.data.countries[iso];
   if (!rec) return '';
-  const w = state.weights, series = rec[state.mode] || {};
+  const w = state.weights;
   const chans = [
     [state.basis, w.trade, state.basis === 'va' ? 'Trade (VA)' : 'Trade'],
     ['energy', w.energy, 'Energy'],
@@ -882,8 +994,10 @@ function stackSVG(iso) {
   for (let i = 0; i < n; i++) {
     let den = 0; const vs = [];
     chans.forEach(([ch, wt], c) => {
-      const v = series[ch]?.[i];
-      if (v == null || Number.isNaN(v)) { vs[c] = null; return; }
+      // chanVal, not the raw series: under "per observed dependency" the bands
+      // must decompose the same divided values the Intensity line is drawn from.
+      const v = chanVal(rec, ch, i);
+      if (v == null) { vs[c] = null; return; }
       vs[c] = v; den += wt;
     });
     if (den <= 0) continue;
@@ -944,6 +1058,7 @@ function stackSVG(iso) {
   return `<svg class="stack" viewBox="0 0 ${W} ${H}" role="img" aria-label="${alt}">${bands}${mark}</svg>`
     + `<div class="stack-key">${key}</div>`
     + `<p class="cap">Share of Intensity, 0-100%. The level is in the series above.`
+    + (state.covnorm ? ` Channel values are per observed dependency (each divided by its covered share; chokepoint unchanged).` : '')
     + (rescaled ? ` Bands also rescale in ${rescaled} of ${n} months where a channel has no data, so a `
         + `band can widen for a coverage reason rather than an exposure one.` : '')
     + `</p>`;
@@ -1548,9 +1663,27 @@ function detailSources(iso) {
     <h2 style="margin-top:14px">Source countries</h2>
     ${shown.map(bar).join('')}
     ${rest > 0 ? `<p class="cap">+ ${rest} smaller sources, ${(restSum * 100).toFixed(1)}% between them. The risk-sources download carries all ${a.rows.length}.</p>` : ''}
-    <p class="cap" style="margin-top:12px">Shares are of this economy’s Intensity, not of the attributed part, so they sum to ${(a.attributedShare * 100).toFixed(1)}% and the chokepoint residual makes up the rest. Chokepoint transit weights a strait rather than a country and cannot be traced to a source (METHODOLOGY.md 3.4).</p>
-    <p class="cap">Dependency weights: ${a.year} benchmark vintage, applied to ${state.months[state.idx]} GPR.</p>
+    <p class="cap" style="margin-top:12px">Shares are of this economy’s Intensity${state.covnorm ? ' per observed dependency (each channel divided by its covered share; chokepoint unchanged)' : ''}, not of the attributed part, so they sum to ${(a.attributedShare * 100).toFixed(1)}% and the chokepoint residual makes up the rest. Chokepoint transit weights a strait rather than a country and cannot be traced to a source (METHODOLOGY.md 3.4).</p>
+    ${selfExcludedCaptionHTML(iso)}
+    ${vintageCaptionHTML(a.year, state.months[state.idx])}
     ${state.data.stale_weights?.[iso] ? `<p class="cap" style="color:var(--warn)">Stopped reporting to Comtrade after ${state.data.stale_weights[iso]}; weights carried forward from that year and increasingly unrepresentative.</p>` : ''}`;
+}
+
+/* Chokepoint ids -> names, for the self-exclusion caption. */
+const CHOKE_NAMES = { red_sea: 'the Red Sea corridor', hormuz: 'Hormuz', malacca: 'Malacca',
+                      taiwan_strait: 'the Taiwan Strait', bosphorus: 'the Bosphorus', danish_straits: 'the Danish Straits' };
+
+/* An economy that is a strait's only GPR-covered littoral would otherwise have
+   its own GPR fed back into its exposure through that strait; the pipeline drops
+   the strait from that economy's chokepoint channel and lists the pair in
+   choke_self_excluded. Say so on the panel, or a Saudi reader sees a Hormuz
+   country with no Hormuz term and reads it as a bug. */
+function selfExcludedCaptionHTML(iso) {
+  const ex = state.data?.choke_self_excluded?.[iso];
+  if (!Array.isArray(ex) || !ex.length) return '';
+  const names = ex.map(k => CHOKE_NAMES[k] || k);
+  const list = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  return `<p class="cap">Chokepoint channel excludes ${list}: this economy is that strait's only GPR-covered littoral, so including it would feed its own GPR back into its exposure (METHODOLOGY §3.4).</p>`;
 }
 
 function detail(iso) {
@@ -1563,28 +1696,35 @@ function detail(iso) {
   if (state.view === 'sources' && state.kind === 'intensity_multi') return detailSources(iso);
   if (state.kind === 'intensity_multi') {
     const total = intensity(iso);
-    const srcs = state.data.top_sources?.[iso] || [];
-    const cov = rec.covered?.trade;
+    const month = state.months[state.idx];
+    // Coverage sits beside every value it qualifies (invariant 7): a channel
+    // number without its covered share reads as exposure when part of it is a
+    // coverage artefact. Chokepoint has no coverage measure and says so.
     const chRows = [[state.basis, state.basis === 'va' ? 'Trade (value added)' : 'Trade (gross)'],['energy','Energy'],['crm','Raw materials'],['choke','Chokepoint']]
       .map(([ch, lbl]) => {
-        const v = rec[state.mode]?.[ch]?.[state.idx];
-        return `<div class="metric"><span>${lbl}</span><b>${v == null ? '—' : (state.mode === 'rebased' ? v.toFixed(0) : v.toFixed(3))}</b></div>`;
+        const v = chanVal(rec, ch, state.idx);
+        const cov = rec.covered?.[ch];
+        const qual = ch === 'choke' ? 'no coverage measure'
+                   : (cov != null ? `${Math.round(cov * 100)}% observed` : '');
+        return `<div class="metric"><span>${lbl}</span><span><b>${v == null ? '—' : (state.mode === 'rebased' ? v.toFixed(0) : v.toFixed(3))}</b>`
+          + (qual ? ` <span style="color:var(--muted);font-size:10.5px">· ${qual}</span>` : '') + `</span></div>`;
       }).join('');
     const sparkHTML = sparkSVG(iso);
     const stackHTML = stackSVG(iso);
     const chartDl = w => `<div class="chartdl-row"><button class="chartdl" type="button" data-chart="${w}">Download SVG</button></div>`;
     el.innerHTML = `
       <h3>${NAMES[iso] || iso}</h3>
-      <div class="iso">${iso} · ${state.months[state.idx]} · Intensity (${state.mode}), your channel mix</div>
+      <div class="iso">${iso} · ${month} · Intensity${state.covnorm ? ' per observed dependency' : ''} (${state.mode}), your channel mix</div>
       <div class="metric"><span><b>Intensity</b></span><b>${total == null ? '—' : (state.mode === 'rebased' ? total.toFixed(1) : total.toFixed(3))}</b></div>
       ${sparkHTML}${sparkHTML ? chartDl('spark') : ''}
       ${chRows}
       ${stackHTML ? `<h2 style="margin-top:16px">Channel decomposition</h2>` + stackHTML + chartDl('stack') : ''}
-      ${cov != null ? `<div class="metric"><span>Trade observed by GPR</span><b>${(cov*100).toFixed(0)}%</b></div>` : ''}
-      ${srcs.length ? `<h2 style="margin-top:14px">Top risk sources (trade, latest month)</h2>` + srcs.map(([j,w,c]) =>
-        `<div class="metric"><span>${NAMES[j] || j} <span style="color:var(--muted)">· ${(w*100).toFixed(1)}% of trade</span></span><b>${c.toFixed(0)}</b></div>`).join('') : ''}
-      ${state.data.stale_weights?.[iso] ? `<p class="cap" style="margin-top:12px;color:var(--warn)">Stopped reporting to Comtrade after ${state.data.stale_weights[iso]}; weights carried forward from that year and increasingly unrepresentative.</p>` : ''}
-      <p class="cap" style="margin-top:12px">Channel values are per-channel exposure before your mix. Raw-materials uses an ores-and-metals proxy; chokepoint uses a coarse routing table — see METHODOLOGY.md.</p>`;
+      ${selfExcludedCaptionHTML(iso)}
+      ${vintageCaptionHTML(vintageFor(month), month)}
+      ${state.data.stale_weights?.[iso] ? `<p class="cap" style="color:var(--warn)">Stopped reporting to Comtrade after ${state.data.stale_weights[iso]}; weights carried forward from that year and increasingly unrepresentative.</p>` : ''}
+      <p class="cap">Channel values are per-channel exposure before your mix${state.covnorm
+        ? ', each divided by the share of its dependency that GPR observes (per observed dependency; chokepoint unchanged)'
+        : '; the percentage beside each is the share of that channel’s dependency GPR observes, and the value scales with it'}. Raw-materials uses an ores-and-metals proxy; chokepoint uses a coarse routing table — see METHODOLOGY.md.</p>`;
     return;
   }
   if (state.kind === 'intensity_trade') {
@@ -1640,7 +1780,7 @@ for (const [id, key] of [['wTrade','trade'],['wEnergy','energy'],['wCrm','crm'],
 
 const NOTES = {
   rebased: 'Each source country indexed to its own 1985–2023 mean = 100. Detects deterioration; understates chronically high-risk states.',
-  level:   'Raw article shares on a common scale. Comparable across countries; dominated by persistent level differences.'
+  level:   'Raw article shares on a common scale. Comparable across countries; dominated by persistent level differences. Levels also scale with how much anglophone press covers a country, so cross-country comparison is confounded by coverage (METHODOLOGY §4).'
 };
 // ---------------------------------------------------------------------------
 // Export. A CSV that leaves this page loses every caveat the interface
@@ -1653,7 +1793,7 @@ const EXPORT_CHANNELS = ['trade', 'va', 'energy', 'crm', 'choke'];
 const EXPORT_COLS = ['iso3', 'name', 'month', 'intensity']
   .concat(EXPORT_CHANNELS.map(c => 'c_' + c))
   .concat(EXPORT_CHANNELS.map(c => 'covered_' + c))
-  .concat(['weights_stale']);
+  .concat(['weights_stale', 'weight_vintage', 'weights_anachronistic']);
 const CITATION = 'Caldara, Dario and Matteo Iacoviello (2022), "Measuring Geopolitical Risk", American Economic Review 112(4), 1194-1225. GPR data licensed CC-BY.';
 
 /* Sliders are renormalised before use, so record the weights actually applied
@@ -1682,26 +1822,71 @@ function exportMeta(scope) {
     ['downloaded', new Date().toISOString().slice(0, 10)],
     ['source_url', location.href.split('#')[0]],
     ['citation', CITATION],
-    ['weights', 'Lagged benchmark-year dependency shares; each month uses the latest benchmark strictly before it (METHODOLOGY.md 5.3). weights_stale gives the last year an economy reported, where it stopped.'],
-    ['coverage', 'covered_* is the share of that channel\'s denominator observed by the GPR-44 source set. Below ~0.70 the channel understates exposure. covered_choke is intentionally empty: the chokepoint weight is a routing indicator, not a share of observed flow, so no comparable coverage share exists - that channel understates by construction, most severely at Hormuz (METHODOLOGY.md 3.4).'],
+    ['weights', 'Lagged benchmark-year dependency shares; each month uses the latest benchmark strictly before it (METHODOLOGY.md 5.3). weights_stale gives the last year an economy reported, where it stopped. weight_vintage is the benchmark year each row is joined to; weights_anachronistic is true where that benchmark postdates the row\'s month.'],
+    ['anachronistic_weights', anachronismMetaText()],
+    ['coverage', 'covered_* is the share of that channel\'s denominator observed by the GPR-44 source set, so as observed each channel value equals covered_* x mean partner GPR over the observed partners. covered_choke is intentionally empty: the chokepoint weight is a routing indicator, not a share of observed flow, so no comparable coverage share exists - that channel understates by construction, most severely at Hormuz (METHODOLOGY.md 3.4).'],
+    ['coverage_normalisation', state.covnorm
+      ? 'per observed dependency: c_trade, c_va, c_energy, c_crm are divided by covered_*; c_choke has no coverage measure and is unchanged; intensity uses the divided values'
+      : 'as observed'],
     ['caution', 'Contemporaneous measure of reported exposure. Neither GPR nor Intensity is a forecast. The channel mix is a sensitivity analysis, not a ranking.'],
   ];
 }
 
+/* One sentence for every export header and chart caption. Built from the
+   payload's weights_anachronistic_through and weight_years, never typed in, so
+   it cannot go stale when the benchmark set changes. */
+function anachronismMetaText() {
+  const through = state.data?.weights_anachronistic_through;
+  const ys = state.data?.weight_years;
+  if (typeof through !== 'string' || !Array.isArray(ys) || !ys.length) return 'not flagged in this payload';
+  const earliest = Math.min.apply(null, ys);
+  return `months through ${through} use the ${earliest} benchmark, which postdates them: exposure under that structure, not the structure of the time (METHODOLOGY.md 5.7)`;
+}
+
+/* Coverage-mode line for chart captions and the PNG footer; the export header
+   carries the same fact under coverage_normalisation. */
+function covModeText() {
+  return state.covnorm
+    ? 'Coverage: per observed dependency - trade, value-added, energy and raw-material values are divided by their covered share; chokepoint has no coverage measure and is unchanged. Thin coverage amplifies noise.'
+    : 'Coverage: as observed - each channel is its covered share x mean partner GPR over the partners GPR observes, so thin coverage lowers the value for a coverage reason.';
+}
+
+/* Anachronism warning for a figure. A single-month figure warns about that
+   month; a series figure warns about the span of months affected. Empty when
+   nothing shown is anachronistic. */
+function anachronismCaptionText(months) {
+  const through = state.data?.weights_anachronistic_through;
+  if (typeof through !== 'string') return '';
+  if (months.length === 1) {
+    const m = months[0];
+    if (!isAnachronistic(m)) return '';
+    const v = vintageFor(m);
+    return `Weights: ${v} benchmark applied to ${m}, a month it postdates - exposure under the ${v} structure, not the structure of the time (METHODOLOGY.md 5.7).`;
+  }
+  if (!months.length || !isAnachronistic(months[0])) return '';
+  return 'Weights: ' + anachronismMetaText() + '.';
+}
+
 function exportRow(iso, i) {
   const rec = state.data.countries[iso];
-  const series = rec[state.mode] || {};
+  const month = state.months[i];
   const num = x => (x == null || Number.isNaN(x)) ? ''
     : (state.mode === 'rebased' ? x.toFixed(2) : x.toFixed(6));
-  const row = { iso3: iso, name: NAMES[iso] || iso, month: state.months[i],
+  const row = { iso3: iso, name: NAMES[iso] || iso, month: month,
                 intensity: num(intensityAt(iso, i)) };
-  for (const ch of EXPORT_CHANNELS) row['c_' + ch] = num(series[ch] ? series[ch][i] : null);
+  // c_* are emitted AS DISPLAYED - divided by covered_* when the toggle is on -
+  // so intensity always re-derives from the c_* columns and the mix in the
+  // header; coverage_normalisation in the header says which mode produced them.
+  for (const ch of EXPORT_CHANNELS) row['c_' + ch] = num(chanVal(rec, ch, i));
   for (const ch of EXPORT_CHANNELS) {
     const c = rec.covered ? rec.covered[ch] : null;
     row['covered_' + ch] = c == null ? '' : c.toFixed(3);
   }
   const st = state.data.stale_weights ? state.data.stale_weights[iso] : null;
   row.weights_stale = st == null ? '' : String(st);
+  const v = vintageFor(month);
+  row.weight_vintage = v == null ? '' : String(v);
+  row.weights_anachronistic = isAnachronistic(month) ? 'true' : 'false';
   return row;
 }
 
@@ -1751,7 +1936,12 @@ function toGeoJSON() {
     const row = exportRow(iso, state.idx), props = {};
     for (const c of EXPORT_COLS) {
       const v = row[c];
-      props[c] = (v === '' || v == null) ? null : (GEO_STR_COLS.includes(c) ? v : Number(v));
+      // weights_anachronistic travels as 'true'/'false' in the CSV; Number()
+      // of either is NaN, so it becomes a real boolean here.
+      props[c] = (v === '' || v == null) ? null
+        : GEO_STR_COLS.includes(c) ? v
+        : c === 'weights_anachronistic' ? v === 'true'
+        : Number(v);
     }
     props.attribution = CITATION;
     features.push({ type: 'Feature', id: ent.id, properties: props,
@@ -1773,15 +1963,19 @@ const REV_COLS = ['row_type', 'source_iso3', 'source_name', 'exposed_iso3', 'exp
 function revMeta(a, scope) {
   const nm = NAMES[a.iso] || a.iso;
   return exportMeta(scope).concat([
-    ['attribution', 'contribution of source j = sum_c theta_c * w^c_ij * G_j,t / sum_c theta_c, '
-      + 'where w is the bilateral dependency weight of the ' + a.year + ' benchmark vintage and G is source-country GPR. '
+    ['attribution', 'contribution of source j = sum_c theta_c * w^c_ij * G_j,t'
+      + (state.covnorm ? ' / covered_c' : '') + ' / sum_c theta_c, '
+      + 'where w is the bilateral dependency weight of the ' + a.year + ' benchmark vintage and G is source-country GPR'
+      + (state.covnorm ? ', and covered_c is the exposed economy\'s covered share of channel c (per observed dependency; see coverage_normalisation)' : '') + '. '
       + 'Recomputed from web/data/weights.json and web/data/gpr.json; both ship with this site.'],
     ['intensity_total', a.total == null ? '' : a.total.toFixed(6)],
     ['attributed_share', a.attributedShare.toFixed(6)],
     ['unattributed_choke_share', a.residualShare.toFixed(6)
       + ' - the chokepoint channel weights a strait, not a country, so this share of ' + nm
       + '’s Intensity has no source country. It is carried as the row_type=unattributed row, not dropped.'],
-    ['weight_vintage', String(a.year) + ' benchmark, applied to ' + state.months[a.i] + ' GPR (METHODOLOGY.md 5.3)'],
+    ['weight_vintage', String(a.year) + ' benchmark, applied to ' + state.months[a.i] + ' GPR (METHODOLOGY.md 5.3)'
+      + (isAnachronistic(state.months[a.i])
+          ? ' - a month it postdates: exposure under the ' + a.year + ' structure, not the structure of the time (METHODOLOGY.md 5.7)' : '')],
   ]);
 }
 
@@ -2046,7 +2240,11 @@ function chartFigure(which, where) {
     state.mode === 'rebased'
       ? 'Rebased: each source country indexed to its own 1985-2023 mean = 100.'
       : 'Level: channel-weighted GPR in raw units.',
+    covModeText(),
     'Weights are lagged benchmark-year dependency shares (METHODOLOGY.md 5.3).',
+    // The Sankey is one month; the series charts span every month, so the
+    // warning names the affected span rather than the marker month.
+    anachronismCaptionText(which === 'sankey' ? [state.months[state.idx]] : state.months),
     state.data.stale_weights?.[iso]
       ? 'Stopped reporting after ' + state.data.stale_weights[iso]
         + '; weights carried forward and increasingly unrepresentative.' : '',
@@ -2107,7 +2305,8 @@ function exportMapPNG() {
   const w = state.weights;
   const mix = 'Channel mix ' + [[state.basis === 'va' ? 'trade (VA)' : 'trade', w.trade],
     ['energy', w.energy], ['raw mat.', w.crm], ['chokepoint', w.choke]]
-    .map(kv => kv[0] + ' ' + kv[1]).join(' · ') + ' · renormalised to sum to 1';
+    .map(kv => kv[0] + ' ' + kv[1]).join(' · ') + ' · renormalised to sum to 1'
+    + ' · coverage: ' + (state.covnorm ? 'per observed dependency' : 'as observed');
 
   // Wrap to the image width before sizing the canvas, so nothing is clipped.
   const gm = document.createElement('canvas').getContext('2d');
@@ -2130,9 +2329,12 @@ function exportMapPNG() {
         + 'which weights a strait rather than a country and is left unattributed; '
         + (NAMES[attrPng.iso] || attrPng.iso) + ' is outlined and is not a source of itself. '
       : '')
+    + (anachronismCaptionText([state.months[state.idx]]) ? anachronismCaptionText([state.months[state.idx]]) + ' ' : '')
     + 'Contemporaneous measure of reported exposure, not a forecast. '
     + 'The channel mix is a sensitivity analysis, not a ranking. '
-    + 'Coverage varies by economy; the data export reports it per channel.');
+    + (state.covnorm
+        ? 'Channel values are per observed dependency: divided by their covered share, chokepoint unchanged; thin coverage amplifies noise. '
+        : 'Coverage varies by economy and scales each value; the data export reports it per channel.'));
   const attrib = wrap((location.host || 'sam0urr.github.io') + ' · downloaded '
     + new Date().toISOString().slice(0, 10) + ' · ' + CITATION + ' Boundaries: Natural Earth.');
   const FOOT = Math.round(89 * S + (caution.length - 1) * LH + 6 * S + attrib.length * LH + 14 * S);
@@ -2211,6 +2413,14 @@ function setBasis(b) {
   document.getElementById('btnVA').setAttribute('aria-pressed', b === 'va');
   render();
 }
+function setCovNorm(on) {
+  state.covnorm = !!on;
+  document.getElementById('btnCovRaw').setAttribute('aria-pressed', !state.covnorm);
+  document.getElementById('btnCovNorm').setAttribute('aria-pressed', state.covnorm);
+  render();
+}
+document.getElementById('btnCovRaw').onclick = () => setCovNorm(false);
+document.getElementById('btnCovNorm').onclick = () => setCovNorm(true);
 function setView(v) {
   state.view = v;
   document.getElementById('btnExposure').setAttribute('aria-pressed', v === 'exposure');

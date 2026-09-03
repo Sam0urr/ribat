@@ -2,6 +2,7 @@
 """Ribat pre-commit verification. Deterministic; no network. Exit 0 = pass."""
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import py_compile
@@ -16,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[3]
 FAIL: list[str] = []
 WARN: list[str] = []
 
-KNOWN_KINDS = {"gpr_source_side", "intensity_trade", "intensity_multi", "bilateral_weights"}
+KNOWN_KINDS = {"gpr_source_side", "intensity_trade", "intensity_multi", "bilateral_weights",
+               "validation_summary"}
 EXPECTED_GPR_SOURCES = 44
 MIN_EXPOSED = 40
 MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
@@ -45,18 +47,24 @@ def main() -> int:
     # 2 ── inline JS ---------------------------------------------------------
     section("javascript")
     html = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
-    blocks = re.findall(r"<script>(.*?)</script>", html, re.S)
-    if not blocks:
-        check(False, "no inline <script> block found in web/index.html")
-    elif shutil.which("node") is None:
-        WARN.append("node not available - JS syntax not checked")
-        print("  warn node not available - skipped")
-    else:
-        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
-            f.write(blocks[-1])
-        r = subprocess.run(["node", "--check", f.name], capture_output=True, text=True)
-        check(r.returncode == 0, "inline script node --check"
-              + ("" if r.returncode == 0 else f": {r.stderr.strip().splitlines()[0]}"))
+    # Both pages carry their logic inline. The story page's script is what
+    # fills the T1/T2/T4 figures from validation.json; a syntax slip there
+    # would leave every card on its typed fallback without anything failing,
+    # so it is checked exactly as the map page is.
+    for page in ("index.html", "story.html"):
+        page_html = (ROOT / "web" / page).read_text(encoding="utf-8")
+        blocks = re.findall(r"<script>(.*?)</script>", page_html, re.S)
+        if not blocks:
+            check(False, f"no inline <script> block found in web/{page}")
+        elif shutil.which("node") is None:
+            WARN.append("node not available - JS syntax not checked")
+            print("  warn node not available - skipped")
+        else:
+            with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:
+                f.write(blocks[-1])
+            r = subprocess.run(["node", "--check", f.name], capture_output=True, text=True)
+            check(r.returncode == 0, f"web/{page}: inline script node --check"
+                  + ("" if r.returncode == 0 else f": {r.stderr.strip().splitlines()[0]}"))
 
     # 3 ── payload contracts -------------------------------------------------
     EXPOSED_SEEN: set[str] = set()
@@ -113,6 +121,16 @@ def main() -> int:
                 check(not missing,
                       f"{p.name}: covers every exposed economy in intensity.json"
                       + ("" if not missing else " -> missing " + ", ".join(sorted(missing)[:5])))
+            continue
+
+        # The validation summary has no month grid either: it is the handful of
+        # report figures story.html reads at load. Its shape is checked here;
+        # its numbers are checked against the report in the methods-review
+        # section below.
+        if kind == "validation_summary":
+            check(all(isinstance(d.get(k), dict) for k in ("t1", "t2", "t4", "anachronistic"))
+                  and bool(MONTH_RE.match(str(d.get("months_through")))),
+                  f"{p.name}: carries t1, t2, t4, anachronistic and months_through")
             continue
 
         months = d.get("months", [])
@@ -434,6 +452,246 @@ def main() -> int:
     check("if (f.id == null) continue;" in html,
           "render loop skips id-less features instead of calling setFeatureState "
           "on them")
+
+    # ── methods review: payload fields, coverage toggle, anachronism flag ----
+    # The review found three things the interface could not say: that a channel
+    # value scales with its covered share (a ranking confound under percentile
+    # colouring), that 84% of the slider runs on a benchmark that postdates it,
+    # and that the chokepoint channel fed an economy's own GPR back through its
+    # own strait. Each fix has a payload field, an interface surface and a
+    # METHODOLOGY section; these checks fail if any of the three goes missing
+    # or if the documented numbers drift from the committed validation report.
+    section("methods review contract")
+    CHOKEPOINTS = {"red_sea", "hormuz", "malacca", "taiwan_strait", "bosphorus", "danish_straits"}
+    ip = ROOT / "web" / "data" / "intensity.json"
+    d = json.loads(ip.read_text(encoding="utf-8")) if ip.exists() else {}
+    if d.get("kind") == "intensity_multi":
+        months = d.get("months") or []
+        econ = set(d.get("countries") or {})
+        through = d.get("weights_anachronistic_through")
+        check(isinstance(through, str) and bool(MONTH_RE.match(through))
+              and bool(months) and through <= months[-1],
+              f"intensity.json: weights_anachronistic_through is YYYY-MM and <= last month ({through!r})")
+        # Derived, never typed in: the last month with no benchmark strictly
+        # before its year, which is the fallback branch of weight_year_for.
+        ys = d.get("weight_years") or []
+        if ys and months:
+            exp = max((m for m in months if not any(int(y) < int(m[:4]) for y in ys)), default=None)
+            check(exp == through,
+                  f"intensity.json: weights_anachronistic_through matches the vintage rule on "
+                  f"weight_years {ys} (rule -> {exp})")
+        lit = d.get("choke_littorals")
+        check(isinstance(lit, dict) and set(lit) == CHOKEPOINTS
+              and all(isinstance(v, list) and v and all(ISO_RE.match(x) for x in v)
+                      for v in lit.values()),
+              "intensity.json: choke_littorals keys are the six chokepoints, values ISO3 lists")
+        gp = ROOT / "web" / "data" / "gpr.json"
+        srcs: set[str] = set()
+        if isinstance(lit, dict) and gp.exists():
+            srcs = set(json.loads(gp.read_text(encoding="utf-8")).get("countries") or {})
+            stray = sorted({x for v in lit.values() for x in v} - srcs)
+            check(not stray, "intensity.json: every littoral has a GPR series"
+                  + ("" if not stray else " -> " + ", ".join(stray)))
+        excl = d.get("choke_self_excluded")
+        check(isinstance(excl, dict) and set(excl) <= econ
+              and all(isinstance(v, list) and v and set(v) <= CHOKEPOINTS for v in excl.values()),
+              "intensity.json: choke_self_excluded keys are present economies, values chokepoint ids")
+        # Both fields are recomputed from the tracked inputs, not from each
+        # other: 03 emits choke_littorals and choke_self_excluded from one
+        # littoral dict, so checking the pairs against the payload's own table
+        # would pass a mis-filtered table consistently. The rule is structural -
+        # chokepoints.csv filtered to states with a GPR series, and an economy is
+        # self-excluded at exactly the straits where it is the only such state,
+        # over the economies that have a trade channel (the set 03 builds
+        # chokepoint rows for; TWN has none).
+        ck_p = ROOT / "data" / "reference" / "chokepoints.csv"
+        if isinstance(lit, dict) and isinstance(excl, dict) and ck_p.exists() and srcs:
+            with ck_p.open(newline="", encoding="utf-8") as fh:
+                table = {row["chokepoint"]: [x for x in row["gpr_littoral_states"].split(";") if x]
+                         for row in csv.DictReader(fh)}
+            exp_lit = {pnt: [x for x in states if x in srcs] for pnt, states in table.items()}
+            check(exp_lit == lit,
+                  "intensity.json: choke_littorals equals chokepoints.csv filtered to GPR-covered states"
+                  + ("" if exp_lit == lit else f" -> expected {json.dumps(exp_lit, sort_keys=True)}"))
+            trade_econ = {iso for iso, rec in (d.get("countries") or {}).items()
+                          if "trade" in (rec.get("rebased") or {})}
+            sole: dict[str, list[str]] = {}
+            for pnt, states in exp_lit.items():
+                if len(states) == 1 and states[0] in trade_econ:
+                    sole.setdefault(states[0], []).append(pnt)
+            check({k: sorted(v) for k, v in sole.items()} == {k: sorted(v) for k, v in excl.items()},
+                  f"intensity.json: choke_self_excluded equals the sole-covered-littoral pairs "
+                  f"recomputed from chokepoints.csv and gpr.json ({json.dumps(excl, sort_keys=True)})")
+        check("top_sources" not in d,
+              "intensity.json: top_sources absent (the reverse map derives it)")
+        check("own GPR" in (d.get("source") or ""),
+              "intensity.json: source string states the own-GPR exclusion")
+
+        # Interface surfaces. Exact ids and header keys are the contract the
+        # front end was built to; METHODOLOGY 5.4, 5.7 and 3.4 name them.
+        for tok, why in (
+            ('id="btnCovRaw"', "coverage toggle: as-observed button"),
+            ('id="btnCovNorm"', "coverage toggle: per-observed-dependency button"),
+            ('id="covNote"', "coverage toggle: note states the identity and the caveats"),
+            ('id="vintageNote"', "legend carries the weight-vintage caption"),
+            ("['coverage_normalisation',", "export header records the coverage mode"),
+            ("['anachronistic_weights',", "export header records the pre-2020 fallback"),
+            ("illustrative starting point", "slider note labels the default mix"),
+            # Code forms, not bare names: the comments mention all three too,
+            # and a comment would satisfy a substring check.
+            ("state.data?.choke_self_excluded?.[", "detail panel reads choke_self_excluded from the payload"),
+            ("function chanVal(", "one helper divides channel values, so panel/export/attribution agree"),
+            ("function vintageFor(", "vintage derived from weight_years, not from lazily loaded weights.json"),
+            ("state.data?.weights_anachronistic_through", "anachronism flag read from the payload"),
+        ):
+            check(tok in html, f"index.html: {why} ({tok})")
+        st_blk = html.split("const state = {")[-1].split("\n};")[0]
+        check("covnorm: false," in st_blk,
+              "index.html: as-observed stays the default (invariant 7) (covnorm: false, in the state block)")
+        cols = html.split("const EXPORT_COLS")[-1].split(";")[0]
+        check("'weight_vintage'" in cols and "'weights_anachronistic'" in cols,
+              "EXPORT_COLS carry weight_vintage and weights_anachronistic")
+        det = html.split("function detail(")[-1]
+        multi = det.split("if (state.kind === 'intensity_trade')")[0]
+        check("top_sources" not in multi,
+              "detail panel (intensity_multi) no longer reads top_sources")
+        check("d3js.org" not in html and "/d3@" not in html and "d3.min.js" not in html,
+              "index.html does not load D3 (SOURCES lists only what is loaded)")
+
+        # Documentation. METHODOLOGY is the contract; its section numbers and
+        # export column list must match the code, and SOURCES must name the two
+        # sources actually joined.
+        meth_p = ROOT / "METHODOLOGY.md"
+        meth = meth_p.read_text(encoding="utf-8") if meth_p.exists() else ""
+        heads = re.findall(r"^## (\d+)\.", meth, re.M)
+        check(bool(heads) and len(heads) == len(set(heads)),
+              f"METHODOLOGY: no two '## N.' headings share a number ({', '.join(heads)})")
+        check(bool(re.search(r"^\*\*5\.7 ", meth, re.M)),
+              "METHODOLOGY: 5.7 (anachronistic weight vintages) present")
+        check(bool(re.search(r"^\*\*5\.8 ", meth, re.M)),
+              "METHODOLOGY: 5.8 (channel discrimination, T4) present")
+        # Read the channel order from the code, not from a list typed here:
+        # EXPORT_COLS in index.html is built from EXPORT_CHANNELS in exactly
+        # this shape, so a reorder there must show up as a doc mismatch.
+        m_ch = re.search(r"EXPORT_CHANNELS = \[([^\]]*)\]", html)
+        chs = re.findall(r"'([a-z]+)'", m_ch.group(1)) if m_ch else []
+        check(bool(chs), f"index.html: EXPORT_CHANNELS parsed ({', '.join(chs)})")
+        exp_cols = (["iso3", "name", "month", "intensity"]
+                    + ["c_" + c for c in chs]
+                    + ["covered_" + c for c in chs]
+                    + ["weights_stale", "weight_vintage", "weights_anachronistic"])
+        # The column list is one backticked, comma-separated block starting at
+        # iso3; it must equal EXPORT_COLS in order, so the two cannot drift.
+        blk = re.search(r"`(iso3,[^`]*)`", meth)
+        listed = [c.strip() for c in blk.group(1).replace("\n", " ").split(",")] if blk else []
+        check(bool(chs) and listed == exp_cols,
+              "METHODOLOGY 6 lists the export columns exactly as EXPORT_COLS derived from EXPORT_CHANNELS"
+              + ("" if listed == exp_cols else f" -> doc has {listed}"))
+        for key in ("coverage_normalisation", "anachronistic_weights", "weights_anachronistic_through",
+                    "choke_self_excluded"):
+            check(f"`{key}`" in meth, f"METHODOLOGY names the payload/header key `{key}`")
+        src_p = ROOT / "SOURCES.md"
+        src = src_p.read_text(encoding="utf-8") if src_p.exists() else ""
+        for tok in ("WITS", "TiVA", "UN Comtrade"):
+            check(tok in src, f"SOURCES.md names the joined source '{tok}'")
+
+        # The committed validation report must agree with the payload it was
+        # run against. story.html no longer types the report's figures: 04
+        # writes them to web/data/validation.json and the page fills data-stat
+        # hooks from it at load, so the checks are (i) the summary equals the
+        # report, figure by figure, and (ii) the page fetches it and carries the
+        # hooks. A monthly refresh then cannot leave a stale number on the page.
+        rep_p = ROOT / "data" / "processed" / "validation_report.txt"
+        if rep_p.exists():
+            rep = rep_p.read_text(encoding="utf-8")
+            check("MISMATCH" not in rep, "validation report: payload and recomputed rules agree")
+            check("T4  STATIC STRUCTURE" in rep, "validation report carries T4")
+            m = re.search(r"anachronistic or contemporaneous through (\d{4}-\d{2})", rep)
+            check(bool(m) and m.group(1) == through,
+                  "validation report's anachronism cutoff equals the payload's")
+
+            vs_p = ROOT / "web" / "data" / "validation.json"
+            vs = json.loads(vs_p.read_text(encoding="utf-8")) if vs_p.exists() else {}
+            check(vs.get("kind") == "validation_summary",
+                  "web/data/validation.json present with kind validation_summary")
+            check(vs.get("months_through") == (months[-1] if months else None),
+                  "validation.json months_through equals intensity.json's last month")
+
+            def near(a, b) -> bool:
+                # Both sides are the same float at three decimals; the tolerance
+                # only absorbs the format-vs-round representation of a tie.
+                try:
+                    return abs(float(a) - float(b)) <= 5e-4
+                except (TypeError, ValueError):
+                    return False
+
+            t1s, t2s, t4s, ans = (vs.get(k) or {} for k in ("t1", "t2", "t4", "anachronistic"))
+            t1 = re.search(r"Cross-sectional Spearman, mean\s*:\s*([-\d.]+)\s*\(min.*?n=(\d+) months\)", rep)
+            check(bool(t1) and near(t1s.get("cross_sectional_mean"), t1.group(1))
+                  and t1s.get("n_months") == int(t1.group(2)),
+                  "validation.json T1 mean and month count equal the report's"
+                  + (f" ({t1.group(1)}, n={t1.group(2)})" if t1 else ""))
+            pp = re.search(r"Pooled Pearson\s+own-GPR vs Intensity\s*:\s*([-\d.]+)", rep)
+            ps = re.search(r"Pooled Spearman own-GPR vs Intensity\s*:\s*([-\d.]+)", rep)
+            check(bool(pp) and bool(ps) and near(t1s.get("pooled_pearson"), pp.group(1))
+                  and near(t1s.get("pooled_spearman"), ps.group(1)),
+                  "validation.json T1 pooled correlations equal the report's")
+            per = dict(re.findall(r"^\s+(trade|va|energy|crm|choke)\s+[-\d.]+\s+[-\d.]+\s+([-\d.]+)\s+\(",
+                                  rep.split("T2  CHANNEL")[0], re.M))
+            check(bool(per) and all(near((t1s.get("per_channel") or {}).get(ch), v)
+                                    for ch, v in per.items()),
+                  f"validation.json T1 per-channel means equal the report's ({len(per)} channels)")
+            m2 = re.search(r"Pairs above 0\.9: (.*)", rep)
+            rep_pairs = re.findall(r"(\w+)-(\w+) ([\d.]+)", m2.group(1)) if m2 else []
+            vs_pairs = {tuple(sorted((a, b))): v for a, b, v in (t2s.get("pairs_above_0_9") or [])}
+            check(bool(m2) and len(rep_pairs) == len(vs_pairs)
+                  and all(near(vs_pairs.get(tuple(sorted((a, b)))), v) for a, b, v in rep_pairs),
+                  "validation.json T2 pairs above 0.9 equal the report's ("
+                  + (", ".join(f"{a}-{b} {v}" for a, b, v in rep_pairs) or "none") + ")")
+            mo = re.search(r"Mean off-diagonal Spearman:\s*([-\d.]+)", rep)
+            dc = re.search(r"Distinguishable channels at that threshold: (\d+)", rep)
+            check(bool(mo) and bool(dc) and near(t2s.get("mean_offdiagonal"), mo.group(1))
+                  and t2s.get("distinguishable_channels") == int(dc.group(1)),
+                  "validation.json T2 mean off-diagonal and bloc count equal the report's")
+            blk_a = rep.split("Sample A:")[-1].split("Sample B:")[0]
+            mix = re.search(r"Intensity \(default mix\)\s+\d+\s+\d+\s+([\d.]+)\s+([\d.]+)\s+[\d.]+\s+([\d.]+)\s+([\d.]+) \(",
+                            blk_a)
+            t4 = re.search(r"Verdict \(Sample A, default mix\): residual ([\d.]+)", rep)
+            mob = re.search(r"Ranking mobility ([\d.]+) ->", rep)
+            check(bool(mix) and bool(t4) and bool(mob)
+                  and near(t4s.get("economy_share"), mix.group(1))
+                  and near(t4s.get("month_share"), mix.group(2))
+                  and near(t4s.get("residual_share"), mix.group(3))
+                  and near(t4s.get("residual_share"), t4.group(1))
+                  and near(t4s.get("ranking_mobility"), mix.group(4))
+                  and near(t4s.get("ranking_mobility"), mob.group(1)),
+                  "validation.json T4 shares and mobility equal the report's Sample A default mix"
+                  + (f" (residual {t4.group(1)}, mobility {mob.group(1)})" if t4 and mob else ""))
+            ck_m = re.search(r"^\s+choke\s+\d+\s+\d+\s+[\d.]+\s+[\d.]+\s+[\d.]+\s+[\d.]+\s+([\d.]+) \(",
+                             blk_a, re.M)
+            check(bool(ck_m) and near(t4s.get("choke_ranking_mobility"), ck_m.group(1)),
+                  "validation.json T4 chokepoint mobility equals the report's Sample A line")
+            an = re.search(r"anachronistic or contemporaneous through (\d{4}-\d{2}): (\d+) of (\d+) months \(([\d.]+)%\)", rep)
+            check(bool(an) and ans.get("through") == an.group(1) and ans.get("n") == int(an.group(2))
+                  and vs.get("n_months_total") == int(an.group(3))
+                  and near(ans.get("share"), float(an.group(4)) / 100),
+                  "validation.json anachronism cutoff, count and share equal the report's")
+
+            story_p = ROOT / "web" / "story.html"
+            story = story_p.read_text(encoding="utf-8") if story_p.exists() else ""
+            check("'./data/validation.json'" in story,
+                  "story.html fetches ./data/validation.json at load")
+            check("function fillStats(" in story and "data-stat" in story.split("function fillStats(")[-1][:1200],
+                  "story.html fills the data-stat hooks from the summary")
+            for hook, why in (("t1_mean", "T1 mean"), ("t1_n", "T1 month count"),
+                              ("t4_residual", "T4 residual share"), ("t4_mobility", "T4 ranking mobility")):
+                check(f'data-stat="{hook}"' in story, f"story.html carries the {why} hook (data-stat=\"{hook}\")")
+            for a, b, _ in rep_pairs:
+                check(f'data-stat="t2_{a}_{b}"' in story or f'data-stat="t2_{b}_{a}"' in story,
+                      f"story.html carries a hook for the T2 pair {a}-{b} the report names")
+    else:
+        WARN.append("intensity.json is not kind=intensity_multi - methods review checks skipped")
+        print("  warn intensity.json is not intensity_multi - skipped")
 
     # ── result --------------------------------------------------------------
     print()

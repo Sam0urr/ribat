@@ -246,9 +246,9 @@ footer a{color:var(--bone-2)}
 
   <div class="band rise d4">
     <div><b id="statEcon">43</b><span>Economies</span></div>
-    <div><b id="statMonths">499</b><span>Monthly observations</span></div>
+    <div><b id="statMonths">500</b><span>Monthly observations</span></div>
     <div><b>4</b><span>Dependency channels</span></div>
-    <div><b>0.17</b><span>Rank correlation with own risk</span></div>
+    <div><b data-stat="t1_mean">0.17</b><span>Rank correlation with own risk</span></div>
   </div>
 
   <!-- ── the argument, as a picture ─────────────────────────────────── -->
@@ -305,9 +305,10 @@ footer a{color:var(--bone-2)}
         <p>Mexico carries heavy exposure with no domestic instability at all,
           because most of its trade runs to a United States sitting above its own
           historical average.</p>
-        <p class="pull">Across every month since 2019 the rank correlation between
-          a country's own risk and its exposure is <b>0.17</b>, close to
-          unrelated. That gap is the whole reason this project exists.</p>
+        <p class="pull">Across every month since 2020, the first with properly
+          lagged dependency weights, the rank correlation between a country's own
+          risk and its exposure is <b data-stat="t1_mean">0.17</b>, close to unrelated. That gap is
+          the whole reason this project exists.</p>
       </section>
 
       <section class="step" data-step="level">
@@ -342,9 +343,15 @@ footer a{color:var(--bone-2)}
           European Red Sea traders; what appeared was a near-uniform rise almost
           everywhere, the signature of a channel carrying one common factor
           instead of separating one economy from another.</p>
-        <p>The diagnosis was concrete: the routing table wrongly sent South-East
+        <p>The diagnosis was concrete. The routing table wrongly sent South-East
           Asia–China trade through the Taiwan Strait, and Russia–East Asia trade
-          through Suez. Correcting both changed the results. Even so, that channel
+          through Suez. It also routed Hong Kong north of the Taiwan Strait, when
+          the Pearl River delta lies to its south. And the channel fed an
+          economy's own risk back through its own strait: Saudi Arabia's Hormuz
+          term was built from Saudi Arabia's GPR alone, Egypt's Red Sea term
+          partly from Egypt's. Each has been corrected — an economy's own GPR is now
+          excluded from the littoral mean, and where nothing remains, that
+          strait contributes nothing to that economy. Even so, that channel
           is <strong>still marked provisional</strong>.</p>
       </section>
 
@@ -359,7 +366,7 @@ footer a{color:var(--bone-2)}
     <h2>The failures ship with the successes.</h2>
     <div class="prose">
       <p>A measure whose failures are hidden should not be trusted with the ones
-        that pass. All three tests below run from the repository, and their report
+        that pass. All four tests below run from the repository, and their report
         is committed alongside the data.</p>
     </div>
     <div class="cards">
@@ -367,21 +374,35 @@ footer a{color:var(--bone-2)}
         <span class="tick">Passed</span>
         <h4>It is not a re-plot</h4>
         <p>Rank correlation between a country's own risk and its exposure averages
-          0.17 across 91 months. Intensity carries information the source-side
-          index does not.</p>
+          <span data-stat="t1_mean">0.17</span> across <span data-stat="t1_n">80</span> months.
+          Intensity carries information the source-side index does not.</p>
       </div>
       <div class="card fail">
         <span class="tick">Mixed</span>
         <h4>One channel barely earns its slider</h4>
-        <p>Raw materials correlates 0.92 with trade, and value-added 0.94. The
+        <p>Raw materials correlates <span data-stat="t2_crm_trade">0.92</span> with
+          trade, and value-added <span data-stat="t2_trade_va">0.94</span>. The
           chokepoint channel discriminates; those two mostly restate gross trade.</p>
       </div>
       <div class="card fail">
         <span class="tick">Failed, then fixed</span>
-        <h4>Three routing errors</h4>
+        <h4>Routing errors and a leak</h4>
         <p>The chokepoint event studies missed their pre-registration. Each failure
-          localised a specific, checkable bug in the shipping-route table instead
-          of a vague miscalibration.</p>
+          localised a checkable bug rather than a vague miscalibration: two routes
+          sent the wrong way, Hong Kong on the wrong side of the Taiwan Strait,
+          missing Red Sea and Malacca legs, China treated as wholly north of the
+          strait — and an economy's own risk fed back through its own strait. All
+          corrected; the channel stays provisional.</p>
+      </div>
+      <div class="card fail">
+        <span class="tick">Mixed</span>
+        <h4>The ranking moves, partly</h4>
+        <p>A two-way fixed-effects fit leaves <span data-stat="t4_residual">0.14</span>
+          of the variance to economy-specific movement, and the cross-sectional
+          ranking correlates <span data-stat="t4_mobility">0.51</span> with itself a
+          year earlier. The mixed index moves; the chokepoint layer
+          (<span data-stat="t4_choke_mobility">0.96</span>) is a fixed structure
+          recoloured by world risk.</p>
       </div>
     </div>
   </section>
@@ -409,15 +430,19 @@ footer a{color:var(--bone-2)}
     via World Bank WITS; OECD TiVA.
     <strong style="color:var(--bone-2)">Boundaries</strong>: Natural Earth,
     public domain.</p>
-  <p>Every figure on this page is read at load time from the same data files the
-    map uses, so nothing here can drift from the pipeline.
+  <p>Every chart on this page is read at load time from the same data files the
+    map uses, so the charts cannot drift from the pipeline. The test results
+    quoted in the cards are read the same way, from
+    <code>data/validation.json</code>, which the validation stage writes next to
+    its report (<code>data/processed/validation_report.txt</code>); the
+    repository's verifier fails if the two disagree.
     <a href="https://github.com/Sam0urr/ribat">Source, methodology and replication files</a>.</p>
 </footer>
 
 <script>
 const NAMES={CAN:'Canada',MEX:'Mexico',USA:'United States',ARG:'Argentina',BRA:'Brazil',CHL:'Chile',COL:'Colombia',PER:'Peru',VEN:'Venezuela',DNK:'Denmark',FIN:'Finland',HUN:'Hungary',NOR:'Norway',POL:'Poland',RUS:'Russia',SWE:'Sweden',UKR:'Ukraine',GBR:'United Kingdom',BEL:'Belgium',FRA:'France',DEU:'Germany',ITA:'Italy',NLD:'Netherlands',PRT:'Portugal',ESP:'Spain',CHE:'Switzerland',EGY:'Egypt',ISR:'Israel',SAU:'Saudi Arabia',ZAF:'South Africa',TUN:'Tunisia',TUR:'Turkey',AUS:'Australia',CHN:'China',HKG:'Hong Kong',JPN:'Japan',KOR:'South Korea',PHL:'Philippines',TWN:'Taiwan',IDN:'Indonesia',IND:'India',MYS:'Malaysia',THA:'Thailand',VNM:'Vietnam'};
 const MIX={trade:55,energy:25,crm:10,choke:10};
-const S={gpr:null,int:null};
+const S={gpr:null,int:null,val:null};
 const nm=i=>NAMES[i]||i;
 
 /* ── data selectors ─────────────────────────────────────────────────── */
@@ -507,7 +532,7 @@ const STEPS={
     s:'Change against the preceding 12 months, in index points',
     rows:movers('2022-02','energy'),f:v=>'+'+Math.round(v),hi:['FIN','POL','SWE','DNK']}),
   fail:()=>({t:'Chokepoint channel, October 2023',
-    s:'Near-uniform movement: the failure that exposed the routing bugs',
+    s:'Change against the preceding 12 months, in index points · as the channel now stands, after the corrections',
     rows:movers('2023-10','choke'),f:v=>'+'+Math.round(v),hi:[]}),
 };
 
@@ -541,12 +566,37 @@ function observe(){
   document.querySelectorAll('.rv').forEach(el=>rio.observe(el));
 }
 
+/* Test figures. The band, the Step 02 pull quote and the cards carry typed
+   fallbacks for a no-fetch reader; validation.json, which 04_validate.py
+   writes next to its report, overwrites them at load, so a monthly refresh
+   cannot leave a stale number on this page. Statistics print to two decimals,
+   the month count as an integer. */
+function fillStats(v){
+  if(!v||v.kind!=='validation_summary') return;
+  const pair=(a,b)=>{
+    const p=((v.t2&&v.t2.pairs_above_0_9)||[]).find(x=>(x[0]===a&&x[1]===b)||(x[0]===b&&x[1]===a));
+    return p?p[2]:null;
+  };
+  const vals={
+    t1_mean:v.t1&&v.t1.cross_sectional_mean, t1_n:v.t1&&v.t1.n_months,
+    t2_crm_trade:pair('crm','trade'), t2_trade_va:pair('trade','va'),
+    t4_residual:v.t4&&v.t4.residual_share, t4_mobility:v.t4&&v.t4.ranking_mobility,
+    t4_choke_mobility:v.t4&&v.t4.choke_ranking_mobility,
+  };
+  document.querySelectorAll('[data-stat]').forEach(el=>{
+    const x=vals[el.dataset.stat]; if(x==null) return;
+    el.textContent=el.dataset.stat==='t1_n'?String(x):Number(x).toFixed(2);
+  });
+}
+
 async function boot(){
-  const [g,t]=await Promise.all([
+  const [g,t,v]=await Promise.all([
     fetch('./data/gpr.json').then(r=>r.ok?r.json():null).catch(()=>null),
     fetch('./data/intensity.json').then(r=>r.ok?r.json():null).catch(()=>null),
+    fetch('./data/validation.json').then(r=>r.ok?r.json():null).catch(()=>null),
   ]);
-  S.gpr=g; S.int=t;
+  S.gpr=g; S.int=t; S.val=v;
+  fillStats(v);
   if(!g&&!t){
     document.getElementById('figTitle').textContent='Figures unavailable';
     document.getElementById('figSub').textContent=
