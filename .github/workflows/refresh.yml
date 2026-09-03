@@ -9,8 +9,16 @@ on:
     - cron: '17 12 1-7 * *'
   workflow_dispatch:
 
+# contents: write to commit the new vintage; pages/id-token to publish it.
+# Publishing from this run rather than leaving it to pages.yml is deliberate:
+# GitHub does not start new workflow runs for pushes made with the built-in
+# GITHUB_TOKEN, so the push below would never wake the deploy workflow and a
+# fresh vintage would sit in the repository, unpublished, until a human pushed
+# something unrelated.
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: data-refresh
@@ -19,12 +27,21 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      # verify.py downgrades its `node --check` of the inline script to a
+      # warning when node is absent, so a runner without it would wave through
+      # a syntax error in index.html. Same reasoning as verify.yml.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
       - name: Install dependencies
         run: pip install --quiet pandas numpy scipy xlrd openpyxl
@@ -78,6 +95,14 @@ jobs:
                       f"{'new vintage, publishing' if changed else 'unchanged, nothing to publish'}\n")
           PY
 
+      # Run the repository's own invariants against the vintage about to be
+      # published, before it is committed. Failing here leaves main untouched
+      # and the live site on the previous vintage, which is the safe direction:
+      # a month of stale data beats a month of wrong data.
+      - name: Verify the new vintage
+        if: steps.check.outputs.changed == 'true'
+        run: python3 .claude/skills/ribat-verify/verify.py
+
       - name: Commit and publish
         if: steps.check.outputs.changed == 'true'
         run: |
@@ -99,3 +124,27 @@ jobs:
           Automated monthly rebuild. Latest months are preliminary and subject
           to revision as delayed newspaper editions enter the search database."
           git push
+
+      # Upload from this workspace, not from a fresh checkout: these are the
+      # exact files the checks above just passed on.
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.check.outputs.changed == 'true'
+        with:
+          path: web
+
+  # Separate job only because deploy-pages requires the github-pages
+  # environment. Skipped entirely on the runs that find no new vintage, which
+  # is most of them.
+  deploy:
+    needs: refresh
+    if: needs.refresh.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
