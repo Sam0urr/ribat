@@ -245,7 +245,7 @@
     transition:transform .1s ease-out}
   .seg button:active,.chartdl:active,.dl button:active:not(:disabled),.modal-close:active,
     .lockrow button:active,.skiplink:active{transform:scale(.97)}
-  .expandable:active{transform:scale(.985)}
+  .expandable:active:not(:has(.sk-band:active,.sk-node:active)){transform:scale(.985)}
   .seg button:not([aria-pressed=true]):active,.chartdl:active,.dl button:active:not(:disabled),
     .modal-close:active,.lockrow button:active{background:rgba(88,166,255,.14)}
   @media (prefers-reduced-motion:reduce){
