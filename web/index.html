@@ -17,7 +17,7 @@
   #map{position:absolute;inset:0}
 
   .banner{position:absolute;top:0;left:0;right:0;z-index:20;background:var(--warn);
-    color:#1a1500;font-size:12px;font-weight:600;padding:6px 14px;letter-spacing:.02em}
+    color:#1a1500;font-size:.75rem;font-weight:600;padding:6px 14px;letter-spacing:.02em}
 
   .panel{position:absolute;z-index:10;background:rgba(22,27,34,.94);
     border:1px solid var(--line);border-radius:8px;backdrop-filter:blur(8px)}
@@ -30,6 +30,19 @@
     display:flex;flex-direction:column;gap:12px;pointer-events:none}
   #left > *{pointer-events:auto}
   #controls{position:static;padding:16px;flex:1 1 auto;min-height:0;overflow-y:auto}
+  /* Scroll-edge fade. The controls run to ~1600px in a ~470px window with
+     nothing to say more exists; a gradient into the panel colour at the
+     scrollport's bottom edge says so without drawing a rule. Sticky inside
+     #controls rather than positioned on #left: it then rides the scrollport's
+     own bottom whatever height the legend takes below, and the overflow clip
+     keeps it inside the rounded corner. The negative margin folds it over the
+     last 40px of content instead of lengthening the scroll; .at-end (set by
+     the scroll listener) removes it once nothing is left below, so the last
+     note is never covered. */
+  #controls::after{content:"";display:block;position:sticky;bottom:0;height:40px;
+    margin:-40px -16px 0;pointer-events:none;transition:opacity .15s linear;
+    background:linear-gradient(rgba(22,27,34,0),rgba(22,27,34,.94))}
+  #controls.at-end::after{opacity:0}
   /* svh, then vh for engines without it: on iOS Safari 100vh is the tall
      viewport, measured with the URL bar retracted, so the panel ran under the
      browser chrome and its last rows could not be scrolled to. The small
@@ -39,54 +52,55 @@
     overflow-y:auto;overscroll-behavior:contain}
   #legend{position:static;padding:12px 14px;flex:0 0 auto}
 
-  h1{font-size:15px;margin:0 0 2px;letter-spacing:-.01em}
-  .sub{font-size:11px;color:var(--muted);margin:0 0 16px;line-height:1.45}
-  h2{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
+  h1{font-size:.9375rem;margin:0 0 2px;letter-spacing:-.01em}
+  .sub{font-size:.6875rem;color:var(--muted);margin:0 0 16px;line-height:1.45}
+  h2{font-size:.625rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);
     margin:18px 0 8px;font-weight:600}
   h2:first-of-type{margin-top:0}
 
-  .row{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px}
+  .row{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:.75rem}
   .row label{flex:0 0 82px;color:var(--muted)}
-  .row output{flex:0 0 34px;text-align:right;font-family:var(--mono);font-size:11px}
+  .row output{flex:0 0 34px;text-align:right;font-family:var(--mono);font-size:.6875rem}
   input[type=range]{flex:1;accent-color:var(--accent);min-width:0}
 
   .seg{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
-  .seg button{flex:1;background:none;border:0;color:var(--muted);font:inherit;font-size:11px;
+  .seg button{flex:1;background:none;border:0;color:var(--muted);font:inherit;font-size:.6875rem;
     padding:6px 4px;cursor:pointer}
   .seg button[aria-pressed=true]{background:var(--accent);color:#06101f;font-weight:600}
 
-  .note{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:7px}
-  .month{font-family:var(--mono);font-size:13px;text-align:center;margin-bottom:6px}
+  .note{font-size:.6563rem;color:var(--muted);line-height:1.5;margin-top:7px}
+  .month{font-family:var(--mono);font-size:.8125rem;text-align:center;margin-bottom:6px}
 
-  #detail h3{margin:0 0 3px;font-size:15px}
-  #detail .iso{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:14px}
+  #detail h3{margin:0 0 3px;font-size:.9375rem}
+  #detail .iso{font-family:var(--mono);font-size:.6875rem;color:var(--muted);margin-bottom:14px}
   .spark{width:100%;height:auto;display:block;margin:2px 0 3px}
   .stack{width:100%;height:auto;display:block;margin:2px 0 3px}
-  .stack-key{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:9.5px;color:var(--muted);
+  .stack-key{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:.625rem;color:var(--muted);
     font-family:var(--mono);margin:0 0 6px;letter-spacing:.02em}
   .stack-key i{display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:1px}
   .spark-cap{display:flex;justify-content:space-between;font-family:var(--mono);
-    font-size:9.5px;color:var(--muted);margin:0 0 12px;letter-spacing:.02em}
-  @media (prefers-reduced-motion:no-preference){.spark path{transition:d .15s linear}}
+    font-size:.625rem;color:var(--muted);margin:0 0 12px;letter-spacing:.02em}
+  /* No transition on the sparkline: sparkSVG() is re-inserted whole through
+     innerHTML on every redraw, so a path never has a prior d to animate from. */
   .chartdl-row{display:flex;justify-content:flex-end;margin-top:3px}
   .chartdl{background:none;border:1px solid var(--line);border-radius:5px;color:var(--muted);
-    font:inherit;font-size:9px;padding:2px 7px;cursor:pointer}
+    font:inherit;font-size:.625rem;padding:2px 7px;cursor:pointer}
   .chartdl:hover{border-color:var(--accent);color:var(--accent)}
   #dlSection{margin-top:18px}
   .dl{display:flex;flex-direction:column;gap:6px;margin-top:6px}
   .dl button{background:none;border:1px solid var(--line);border-radius:6px;color:var(--ink);
-    font:inherit;font-size:11px;padding:7px 8px;cursor:pointer;text-align:left}
+    font:inherit;font-size:.6875rem;padding:7px 8px;cursor:pointer;text-align:left}
   .dl button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
   .dl button:disabled{color:var(--muted);cursor:not-allowed;opacity:.55}
   .metric{display:flex;justify-content:space-between;align-items:baseline;
-    padding:7px 0;border-bottom:1px solid var(--line);font-size:12px}
+    padding:7px 0;border-bottom:1px solid var(--line);font-size:.75rem}
   .metric:last-child{border-bottom:0}
-  .metric b{font-family:var(--mono);font-weight:600;font-size:13px}
-  .empty{font-size:12px;color:var(--muted);line-height:1.5}
+  .metric b{font-family:var(--mono);font-weight:600;font-size:.8125rem}
+  .empty{font-size:.75rem;color:var(--muted);line-height:1.5}
   /* Source attribution rows. A bar rather than a bare number: the distribution
      is extremely skewed - one or two partners routinely carry half the total -
      and a column of percentages hides that shape. */
-  .srcrow{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:11px}
+  .srcrow{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:.6875rem}
   .srcrow .nm{flex:0 0 100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .srcrow .bar{flex:1;height:8px;background:#0d1117;border:1px solid var(--line);
     border-radius:2px;overflow:hidden}
@@ -98,12 +112,12 @@
   .ramp i{flex:1}
   .ticks{position:relative;height:13px;width:100%}
   .ticks span{position:absolute;transform:translateX(-50%);font-family:var(--mono);
-    font-size:9.5px;color:var(--muted);white-space:nowrap}
+    font-size:.625rem;color:var(--muted);white-space:nowrap}
   .ticks span.anchor{color:var(--ink);font-weight:600}
-  .legend-unit{font-size:10px;color:var(--muted);width:100%;margin-top:3px;line-height:1.4}
+  .legend-unit{font-size:.625rem;color:var(--muted);width:100%;margin-top:3px;line-height:1.4}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
     clip:rect(0 0 0 0);white-space:nowrap;border:0}
-  .cap{font-size:10px;color:var(--muted);margin-top:8px;max-width:100%;line-height:1.45}
+  .cap{font-size:.625rem;color:var(--muted);margin-top:8px;max-width:100%;line-height:1.45}
 
   /* Sankey interaction. Dim/lit is opacity only - no new hues, no second
      palette (invariant 5): the ramp keeps meaning what it means and the
@@ -111,7 +125,7 @@
   .sankey{width:100%;height:auto;display:block;margin:2px 0 3px}
   .expandable{position:relative;cursor:zoom-in;border-radius:4px}
   .expandable:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .expand-badge{position:absolute;top:2px;right:2px;font-size:8.5px;color:var(--muted);
+  .expand-badge{position:absolute;top:2px;right:2px;font-size:.625rem;color:var(--muted);
     background:rgba(13,17,23,.75);border:1px solid var(--line);border-radius:4px;
     padding:1px 4px;pointer-events:none;letter-spacing:.03em}
   .expandable:hover .expand-badge{color:var(--accent);border-color:var(--accent)}
@@ -146,20 +160,20 @@
      a screen reader then gets row/column context for free rather than needing
      it rebuilt out of aria attributes. */
   #skBody > .srctable{flex:1 1 auto;width:100%}
-  table.srcfull{width:100%;border-collapse:collapse;font-size:12px}
-  table.srcfull caption{text-align:left;font-size:11px;color:var(--muted);
+  table.srcfull{width:100%;border-collapse:collapse;font-size:.75rem}
+  table.srcfull caption{text-align:left;font-size:.6875rem;color:var(--muted);
     padding:0 0 8px;line-height:1.45}
   table.srcfull th,table.srcfull td{padding:4px 8px;text-align:right;white-space:nowrap}
   /* Column headers only. Scoped to thead because the row headers are country
      names, and uppercasing and muting those made the table's subject the least
      readable thing in it. */
-  table.srcfull thead th{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;
+  table.srcfull thead th{font-size:.625rem;text-transform:uppercase;letter-spacing:.07em;
     color:var(--muted);font-weight:600;border-bottom:1px solid var(--line);
     position:sticky;top:0;background:var(--panel);z-index:2}
   table.srcfull tbody th{font-weight:400;color:var(--ink)}
   table.srcfull td.nm,table.srcfull th.nm{text-align:left;white-space:normal}
   table.srcfull td.rk,table.srcfull th.rk{text-align:right;color:var(--muted);
-    font-family:var(--mono);font-size:10.5px;width:34px}
+    font-family:var(--mono);font-size:.6563rem;width:34px}
   table.srcfull td.num{font-family:var(--mono)}
   table.srcfull tbody tr:nth-child(even){background:rgba(255,255,255,.017)}
   table.srcfull tbody tr.idle td,table.srcfull tbody tr.idle th{color:var(--muted);opacity:.7}
@@ -181,11 +195,11 @@
   }
   #sankeyTip{position:fixed;z-index:60;max-width:330px;pointer-events:none;
     background:rgba(13,17,23,.97);border:1px solid var(--line);border-radius:6px;
-    padding:7px 9px;font-size:11px;line-height:1.45;color:var(--ink);
+    padding:7px 9px;font-size:.6875rem;line-height:1.45;color:var(--ink);
     box-shadow:0 6px 20px rgba(0,0,0,.5)}
   #sankeyTip b{font-family:var(--mono);font-weight:600}
   #sankeyTip .tw{color:var(--warn)}
-  #sankeyTip .tm{color:var(--muted);font-size:10px;display:block;margin-top:3px}
+  #sankeyTip .tm{color:var(--muted);font-size:.625rem;display:block;margin-top:3px}
 
   /* Expanded view. A dialog rather than a route: the month, mix and basis behind
      it stay live, and closing must put the reader back exactly where they were. */
@@ -196,10 +210,10 @@
     width:min(1180px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden}
   .modal-head{display:flex;align-items:flex-start;gap:12px;padding:14px 16px 10px;
     border-bottom:1px solid var(--line);flex:0 0 auto}
-  .modal-head h2{margin:0;font-size:13px;text-transform:none;letter-spacing:0;color:var(--ink)}
-  .modal-head .iso{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px}
+  .modal-head h2{margin:0;font-size:.8125rem;text-transform:none;letter-spacing:0;color:var(--ink)}
+  .modal-head .iso{font-family:var(--mono);font-size:.6875rem;color:var(--muted);margin-top:3px}
   .modal-close{margin-left:auto;background:none;border:1px solid var(--line);border-radius:6px;
-    color:var(--muted);font:inherit;font-size:11px;padding:5px 10px;cursor:pointer;flex:0 0 auto}
+    color:var(--muted);font:inherit;font-size:.6875rem;padding:5px 10px;cursor:pointer;flex:0 0 auto}
   .modal-close:hover{border-color:var(--accent);color:var(--accent)}
   .modal-body{flex:1 1 auto;min-height:0;overflow:auto;padding:12px 16px;
     display:flex;align-items:flex-start}
@@ -210,16 +224,45 @@
   .modal-foot{flex:0 0 auto;border-top:1px solid var(--line);padding:10px 16px 14px}
   .modal-foot .cap{margin-top:5px}
   .skiplink{position:absolute;left:-9999px;top:0;background:var(--accent);color:#06101f;
-    padding:6px 10px;border-radius:0 0 6px 0;font-size:11px;z-index:61;text-decoration:none}
+    padding:6px 10px;border-radius:0 0 6px 0;font-size:.6875rem;z-index:61;text-decoration:none}
   .skiplink:focus{left:0}
   #detail .skiplink{position:static;display:none;width:100%;text-align:center;
     border-radius:5px;margin-bottom:4px}
   #detail .skiplink:focus{display:block;left:auto}
-  .lockrow{display:flex;align-items:center;gap:10px;font-size:10.5px;color:var(--muted);
+  .lockrow{display:flex;align-items:center;gap:10px;font-size:.6563rem;color:var(--muted);
     margin-top:6px;flex-wrap:wrap}
   .lockrow button{background:none;border:1px solid var(--line);border-radius:5px;
-    color:var(--muted);font:inherit;font-size:10px;padding:2px 7px;cursor:pointer}
+    color:var(--muted);font:inherit;font-size:.625rem;padding:2px 7px;cursor:pointer}
   .lockrow button:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* Press states. Hover marks the target; the press acknowledges it, and it
+     lands on pointer-down, before the click resolves. A selected segment
+     keeps its accent fill under the press - the tint would read as the
+     selection being lost. Sankey bands and nodes are left out: their opacity
+     highlight is already the pointer-down response, and a scale on an SVG
+     path shifts it from the drawing origin. */
+  .seg button,.chartdl,.dl button,.modal-close,.lockrow button,.skiplink,.expandable{
+    transition:transform .1s ease-out}
+  .seg button:active,.chartdl:active,.dl button:active:not(:disabled),.modal-close:active,
+    .lockrow button:active,.skiplink:active{transform:scale(.97)}
+  .expandable:active{transform:scale(.985)}
+  .seg button:not([aria-pressed=true]):active,.chartdl:active,.dl button:active:not(:disabled),
+    .modal-close:active,.lockrow button:active{background:rgba(88,166,255,.14)}
+  @media (prefers-reduced-motion:reduce){
+    .seg button,.chartdl,.dl button,.modal-close,.lockrow button,.skiplink,.expandable{transition:none}}
+  /* Transparency and contrast preferences. The frosted panel is a material,
+     not information: a reader who has asked for less transparency or more
+     contrast gets the same panels, opaque and edged. */
+  @media (prefers-reduced-transparency:reduce),(prefers-contrast:more){
+    .panel,#sankeyModal{backdrop-filter:none}
+    .panel{background:var(--panel)}
+    #controls::after{background:linear-gradient(rgba(22,27,34,0),var(--panel))}
+    #sankeyTip,.expand-badge{background:var(--bg)}
+    #sankeyModal{background:rgb(6,9,13)}
+  }
+  @media (prefers-contrast:more){
+    .panel,#sankeyTip,.modal-card{border-color:var(--ink);--muted:#b1bac4}
+  }
   /* The overlay layout needs roughly 620px of width for the two panels plus
      their margins. Below that they overlapped each other — 247px of overlap at
      375px, detail over controls, both on z-index 10 — and together covered all
@@ -240,12 +283,25 @@
        at the wrong aspect. min-height covers landscape, where 52% is thin. */
     #map{position:relative;inset:auto;order:1;flex:none;width:100%;
       height:52vh;height:52svh;min-height:240px}
-    #left,#detail{position:static;order:3;width:auto;top:auto;right:auto;
+    /* The column dissolves (display:contents) so its two panels become flex
+       items of body in their own right: the legend can then sit under the
+       map it decodes instead of two screens down, beneath every control. Its
+       children stay its children, so the pointer-events and inert handling
+       on #left still reach them. Detail stays above the controls. */
+    #left{display:contents}
+    #legend,#detail,#controls{position:static;width:auto;top:auto;right:auto;
       bottom:auto;left:auto;margin:10px 10px 0;max-height:none;
       overflow:visible}
-    #detail{order:2;padding:14px}
-    #left{margin-bottom:16px}
-    #controls{overflow:visible;flex:none}
+    #legend{order:2}
+    #detail{order:3;padding:14px}
+    #controls{order:4;flex:none;margin-bottom:16px}
+    #controls::after{display:none}
+    /* Before a selection the detail panel is only its hint. Kept - it is how
+       a phone user learns to tap - but at 90px it pushed the legend down for
+       one sentence. Only-child: the same class carries error text under a
+       country heading, which must keep the full panel. */
+    #detail:has(> .empty:only-child){padding:8px 14px}
+    #detail > .empty:only-child{margin:0;font-size:.6875rem}
     #sankeyModal{padding:0}
     .modal-card{border-radius:0;width:100%}
     /* Shrinking 43 labelled sources to fit a phone renders them at about 4px.
@@ -2646,6 +2702,20 @@ document.getElementById('btnVA').onclick = () => setBasis('va');
 
 document.getElementById('btnGlobe').onclick = () => setProj('globe');
 document.getElementById('btnFlat').onclick = () => setProj('mercator');
+
+/* Scroll-edge fade on the control column (#controls::after in the CSS). It is
+   there to say "more below", so it goes once nothing is. Children are observed
+   as well as the panel: the notes change length with the toggles, which moves
+   the end of the scroll without any scroll event. */
+{
+  const c = document.getElementById('controls');
+  const edge = () => c.classList.toggle('at-end', c.scrollTop + c.clientHeight >= c.scrollHeight - 1);
+  c.addEventListener('scroll', edge, { passive: true });
+  const ro = new ResizeObserver(edge);
+  ro.observe(c);
+  for (const k of c.children) ro.observe(k);
+  edge();
+}
 
 // ---------------------------------------------------------------------------
 // ISO 3166-1 numeric -> alpha-3, restricted to the 44 GPR countries.

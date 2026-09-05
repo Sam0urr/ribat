@@ -44,6 +44,8 @@ h1,h2,h3{font-family:var(--display);font-weight:400;color:var(--bone);
 a{color:var(--blue);text-underline-offset:3px;text-decoration-thickness:1px;
   overflow-wrap:anywhere}
 a:hover{color:var(--bone)}
+a:focus-visible,nav a:focus-visible,.toc a:focus-visible,.cta:focus-visible{
+  outline:2px solid var(--amber);outline-offset:3px}
 .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;
   text-transform:uppercase;color:var(--muted)}
 .rule{height:1px;background:var(--line);border:0;margin:56px 0 0}
@@ -53,13 +55,22 @@ header{position:sticky;top:0;z-index:40;
   backdrop-filter:blur(10px)}
 nav{display:flex;align-items:center;gap:26px;padding:16px var(--gutter);
   border-bottom:1px solid var(--line-2)}
+/* The bar's gradient-plus-blur is decoration; readers who have asked for
+   less transparency or more contrast get a flat, opaque bar instead. */
+@media (prefers-reduced-transparency:reduce){header{background:var(--ink);backdrop-filter:none}}
+@media (prefers-contrast:more){
+  header{background:var(--ink);backdrop-filter:none}
+  nav{border-bottom-color:var(--bone-2)}
+}
 nav .mark{font-family:var(--display);font-size:19px;color:var(--bone);
   letter-spacing:.01em;font-variation-settings:'opsz' 40,'WONK' 1;text-decoration:none}
 nav .mark span{color:var(--amber)}
 nav .sp{flex:1}
 nav a{font-family:var(--mono);font-size:11.5px;letter-spacing:.1em;
-  text-transform:uppercase;text-decoration:none;color:var(--muted)}
+  text-transform:uppercase;text-decoration:none;color:var(--muted);
+  transition:transform .2s}
 nav a:hover,nav a[aria-current]{color:var(--bone)}
+nav a:not(.mark):active{color:var(--bone);transform:scale(.97);transition:transform 100ms ease-out}
 
 .hero{padding:clamp(56px,10vh,120px) var(--gutter) clamp(36px,6vh,64px);max-width:1220px}
 .hero .eyebrow{display:block;margin-bottom:22px}
@@ -123,6 +134,7 @@ td:first-child{white-space:nowrap}
   text-decoration:none;color:var(--ink);background:var(--bone);
   padding:15px 26px;border-radius:2px;transition:transform .3s,background .3s}
 .cta:hover{background:var(--amber);color:var(--ink);transform:translateX(5px)}
+.cta:active{transform:translateX(5px) scale(.97);transition:transform 100ms ease-out}
 footer{border-top:1px solid var(--line);padding:36px var(--gutter) 72px;
   font-size:12.5px;color:var(--muted);line-height:1.75}
 footer p{max-width:76ch;margin:0 0 10px}
