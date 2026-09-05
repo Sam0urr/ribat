@@ -139,6 +139,7 @@ h2{font-size:clamp(28px,4.4vw,54px);line-height:1.04;margin:0 0 22px;
   transition:stroke-dashoffset .5s cubic-bezier(.3,.7,.3,1)}
 .in #slope path{stroke-dashoffset:0}
 .slope-note{margin-top:14px;font-size:13.5px;color:var(--muted);max-width:62ch}
+.slope-seg,.slope-list{display:none}
 
 /* ── scrollytelling ───────────────────────────────────────────────────── */
 .scrolly{display:grid;grid-template-columns:minmax(0,.92fr) minmax(0,1fr);
@@ -208,6 +209,26 @@ footer p{max-width:76ch;margin:0 0 10px}
 footer a{color:var(--bone-2)}
 
 @media (max-width:900px){
+  .slope-wrap{overflow:visible;padding:16px 14px 6px}
+  .slope-head,#slope{display:none}
+  .slope-seg{display:flex;border:1px solid var(--line);border-radius:3px;overflow:hidden;
+    margin-bottom:10px}
+  .slope-seg button{flex:1;background:none;border:0;padding:9px 0;font-family:var(--mono);
+    font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+    cursor:pointer;transition:transform 100ms ease-out,background .2s,color .2s}
+  .slope-seg button[aria-pressed=true]{background:var(--bone);color:var(--ink)}
+  .slope-seg button:active{transform:scale(.97)}
+  .slope-list{display:flex;flex-direction:column;list-style:none;margin:0;padding:0}
+  .slope-list li{display:flex;align-items:center;gap:12px;height:40px;
+    border-bottom:1px solid var(--line);will-change:transform}
+  .slope-list li:last-child{border-bottom:0}
+  .slope-list .sr{flex:0 0 26px;font-family:var(--mono);font-size:10.5px;color:var(--muted);
+    text-align:right;font-variant-numeric:tabular-nums}
+  .slope-list .sn{flex:1;font-family:var(--sans);font-size:14px;color:var(--bone-2)}
+  .slope-list li.mv .sn{color:var(--bone);font-weight:500}
+  .slope-list .sd{font-family:var(--mono);font-size:10.5px;color:var(--muted);
+    font-variant-numeric:tabular-nums}
+  .slope-list li.mv .sd{color:var(--amber)}
   /* One column, so the figure no longer sits beside the prose: it pins above
      it and every step scrolls underneath. Two consequences the desktop layout
      never had. The background gradient ends at 40% alpha, which was legible
@@ -310,6 +331,15 @@ footer a{color:var(--bone-2)}
 
     <div class="slope-wrap">
       <div class="slope-head"><span>Reported risk · GPR</span><span>Borne risk · Intensity</span></div>
+      <!-- Phone stand-in for the slope chart. Two label columns cannot fit in
+           333px, and a sideways scroll hid the right column - the answer -
+           with nothing to say so. Here the same twelve rows re-sort in place
+           between the two rankings; the reorder is the crossing. -->
+      <div class="slope-seg" role="group" aria-label="Ranking shown">
+        <button type="button" data-m="a" aria-pressed="true">Reported</button>
+        <button type="button" data-m="b" aria-pressed="false">Borne</button>
+      </div>
+      <ol class="slope-list" id="slopeList"></ol>
       <svg id="slope" viewBox="0 0 720 460" role="img"
            aria-label="Slope chart connecting each country's rank by reported geopolitical risk to its rank by exposure. The lines cross extensively; the two rankings are nearly independent."></svg>
       <p class="slope-note" id="slopeNote"></p>
@@ -561,10 +591,81 @@ function drawSlope(){
        + `<text class="rk" x="${R+16}" y="${y2+4}" dx="${Math.max(58,nm(r.iso).length*7.2)}">${rank}</text>`;
   });
   document.getElementById('slope').innerHTML=svg;
+  drawSlopeList(rows,iRank);
   document.getElementById('slopeNote').textContent=
     `${moved} of these ${rows.length} most-reported countries move at least four `
     + `places once exposure is measured instead of origin; those lines are `
     + `highlighted. Ranks are for ${S.int.months[S.int.months.length-1]}.`;
+}
+
+/* Phone slope: the same twelve rows as the SVG, re-sorted in place. A FLIP
+   reorder on transform only: measure where each row is on screen (including
+   any transform still in flight, so a toggle mid-move starts from where the
+   row actually is), cancel, re-sort, measure again, animate the difference to
+   zero. Rank digits count across the move. Autoplays once when the list is
+   mostly in view, unless the reader already toggled it or asked for reduced
+   motion - a silent reorder with no motion to explain it would just confuse. */
+const SLOPE_EASE='cubic-bezier(.77,0,.175,1)';
+let slopeUserToggled=false;
+function drawSlopeList(rows,iRank){
+  const list=document.getElementById('slopeList');
+  list.innerHTML=rows.map((r,k)=>{
+    const a=k+1,b=iRank.get(r.iso),d=a-b,mv=Math.abs(d)>=4;
+    const chip=d===0?'·':(d>0?'\u2191':'\u2193')+Math.abs(d);
+    return `<li data-iso="${r.iso}" data-a="${a}" data-b="${b}"${mv?' class="mv"':''} style="order:${a}">`
+      + `<b class="sr">${a}</b><span class="sn">${nm(r.iso)}</span><span class="sd">${chip}</span></li>`;
+  }).join('');
+  const seg=document.querySelector('.slope-seg');
+  seg.addEventListener('click',e=>{
+    const btn=e.target.closest('button[data-m]');
+    if(!btn||btn.getAttribute('aria-pressed')==='true') return;
+    slopeUserToggled=true;
+    setSlope(btn.dataset.m);
+  });
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(!reduce&&'IntersectionObserver' in window){
+    const io=new IntersectionObserver(es=>{
+      if(!es.some(e=>e.isIntersecting)) return;
+      io.disconnect();
+      setTimeout(()=>{ if(!slopeUserToggled) setSlope('b'); },700);
+    },{threshold:.6});
+    io.observe(list);
+  }
+}
+function setSlope(mode){
+  const list=document.getElementById('slopeList');
+  if(!list||getComputedStyle(list).display==='none') return;
+  const items=[...list.children];
+  const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  document.querySelectorAll('.slope-seg button').forEach(b=>
+    b.setAttribute('aria-pressed',String(b.dataset.m===mode)));
+  const first=new Map(items.map(li=>[li,li.getBoundingClientRect().top]));
+  items.forEach(li=>li.getAnimations().forEach(a=>a.cancel()));
+  items.forEach(li=>{ li.style.order=li.dataset[mode]; });
+  if(reduce){
+    items.forEach(li=>{ li.querySelector('.sr').textContent=li.dataset[mode]; });
+    list.animate([{opacity:1},{opacity:.4},{opacity:1}],{duration:200,easing:'ease'});
+    return;
+  }
+  const DUR=520;
+  items.forEach(li=>{
+    const dy=first.get(li)-li.getBoundingClientRect().top;
+    const delay=Math.abs(+li.dataset.a-+li.dataset.b)>=4?0:30*(+li.dataset.a-1);
+    if(dy) li.animate([{transform:`translateY(${dy}px)`},{transform:'none'}],
+      {duration:DUR,delay,easing:SLOPE_EASE,fill:'both'});
+    // A toggle mid-count must retire the old loop, or both keep writing and
+    // the stale one lands last.
+    const sr=li.querySelector('.sr'),from=+sr.textContent,to=+li.dataset[mode];
+    const token=li._tick=(li._tick||0)+1;
+    if(from!==to){
+      const t0=performance.now();
+      const tick=t=>{if(li._tick!==token) return;
+        const u=Math.min(1,(t-t0-delay)/DUR);
+        if(u>=0) sr.textContent=Math.round(from+(to-from)*(1-Math.pow(1-u,3)));
+        if(u<1) requestAnimationFrame(tick);};
+      requestAnimationFrame(tick);
+    }
+  });
 }
 
 /* ── scrollytelling figure ──────────────────────────────────────────── */
