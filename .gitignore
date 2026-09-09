@@ -18,3 +18,9 @@ data/processed/*.txt
 __pycache__/
 *.pyc
 .DS_Store
+
+# Visual reference for the story page, kept beside the work for convenience.
+# Watermarked stock and agency photographs: direction only, never shipped. The
+# repository is public and carries a binding CC-BY attribution chain, so one
+# absent-minded `git add -A` would publish images we hold no licence to.
+Pics Risk/
