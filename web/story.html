@@ -19,6 +19,13 @@
   --sans:'IBM Plex Sans',ui-sans-serif,system-ui,sans-serif;
   --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
   --gutter:clamp(20px,5vw,64px);
+  /* The frontispiece's own inks. A hairline at --line-2 (.07 alpha) composites
+     to roughly 1.09:1 over the ink, below the threshold at which a 1px stroke
+     is visible at all, so the plate carries its own scale rather than borrowing
+     the graticule's. Namespaced --rbt-* so nothing here can collide with a
+     token the rest of the document already relies on. */
+  --rbt-ink-1:rgba(236,228,212,.55); --rbt-ink-2:rgba(236,228,212,.34);
+  --rbt-ink-3:rgba(236,228,212,.20); --rbt-sea:rgba(109,167,236,.40);
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
@@ -73,7 +80,7 @@ nav a:not(.mark):active{color:var(--bone);transform:scale(.97);transition:transf
 
 /* ── hero ─────────────────────────────────────────────────────────────── */
 .hero{padding:clamp(80px,14vh,170px) var(--gutter) clamp(60px,10vh,110px);
-  max-width:1220px}
+  max-width:1220px;position:relative}
 .hero .eyebrow{display:block;margin-bottom:26px}
 .hero h1{
   font-size:clamp(38px,7.6vw,104px);line-height:.98;margin:0 0 34px;
@@ -96,7 +103,41 @@ nav a:not(.mark):active{color:var(--bone);transform:scale(.97);transition:transf
   animation:rise .45s cubic-bezier(.22,.7,.24,1) forwards}
 @keyframes rise{to{opacity:1;transform:none}}
 .d1{animation-delay:.05s}.d2{animation-delay:.18s}
-.d3{animation-delay:.32s}.d4{animation-delay:.5s}
+.d3{animation-delay:.32s}.d4{animation-delay:.5s}.d5{animation-delay:.62s}
+
+/* ── frontispiece ──────────────────────────────────────────────────────────
+   An engraved plate: not a photograph, and deliberately not a chart. It plots
+   nothing. A curve traced from gpr.json would invite a finding to be read out
+   of ornament, and one from invented numbers would be a lie in a project whose
+   whole premise is stating its limits. It also makes no claim in copy: the
+   watchpost is glossed once, in the eyebrow, as etymology, and the drawing is
+   left to be a place rather than an argument. A tower is an observer, and the
+   observer here is the newspaper count, not the economy that pays — so the
+   picture is given a landing that receives traffic, and says nothing more.
+   It shares the hero's screen instead of adding a scrolled stage. The page's
+   strongest editorial asset is that the thesis, the defect in the instrument
+   and the four numbers all arrive within about a screen and a half, and no
+   ornament is worth pushing the band below the fold for. Nothing here runs
+   JavaScript or listens to scroll; the entrance is the existing .rise
+   keyframe, so reduced motion is already handled by the block that governs
+   every other entrance on the page. */
+/* Anchored to the bottom-right rather than the top, because that is the only
+   part of the hero that is actually empty: the thesis runs to within ~200px of
+   the right edge, and a plate hung from the top put its horizon straight
+   through the second line like a strikethrough. Hung from the baseline it sits
+   in the pocket beside the lede, clear of every line of type. */
+.rbt-plate{position:absolute;z-index:0;pointer-events:none;
+  right:0;bottom:clamp(16px,2.5vh,30px);width:min(34%,400px);height:auto}
+.hero .eyebrow,.hero h1,.hero .lede,.hero .scroll-cue{position:relative;z-index:1}
+/* non-scaling-stroke keeps every line a true hairline however the plate is
+   scaled, which is the whole character of an engraving; the principal contour
+   and the tower carry a little more weight so the eye has somewhere to land. */
+.rbt-plate path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.rbt-i1{stroke-width:1.25}
+.rbt-sea{stroke:var(--rbt-sea)}
+.rbt-i1{stroke:var(--rbt-ink-1)}
+.rbt-i2{stroke:var(--rbt-ink-2)}
+.rbt-i3{stroke:var(--rbt-ink-3)}
 
 /* ── stat band ────────────────────────────────────────────────────────── */
 .band{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
@@ -253,6 +294,10 @@ footer a{color:var(--bone-2)}
   .bars .vl{font-size:11px}
   .step{min-height:auto;padding:34px 0}
   .hero h1{max-width:none}
+  /* One column leaves the plate nowhere to stand: it would either sit behind
+     the thesis or push the band below the fold, and the band is the argument.
+     Ornament is the thing that goes. */
+  .rbt-plate{display:none}
   /* The sticky offset above assumes a single-line nav. Wrapped, the header
      grows past it and clips the top of the card, so the bar is tightened
      enough to hold one line at 320px. */
@@ -271,7 +316,9 @@ footer a{color:var(--bone-2)}
      border goes there rather than stacking a second line under it. Muted text
      sits at ~4.9:1 on the ink; #9aa3b1 lifts it past 7:1 while staying below
      bone-2, so the type hierarchy survives. */
-  :root{--muted:#9aa3b1}
+  :root{--muted:#9aa3b1;
+    --rbt-ink-1:rgba(236,228,212,.46); --rbt-ink-2:rgba(236,228,212,.30);
+    --rbt-ink-3:rgba(236,228,212,.20); --rbt-sea:rgba(109,167,236,.38)}
   header{background:var(--ink);backdrop-filter:none}
   nav{border-bottom-color:var(--bone-2)}
   .bars li.dim .nm,.bars li.dim .vl{color:var(--muted)}
@@ -309,6 +356,35 @@ footer a{color:var(--bone-2)}
       different question from which economies bear the cost, and the two
       answers barely overlap.</p>
     <div class="scroll-cue rise d4"><i></i> Scroll</div>
+
+    <!-- Decorative. No data, no caption, no claim; hidden from assistive
+         technology, and last in the source so the thesis is read first. -->
+    <!-- No xmlns: the HTML parser already places this in the SVG namespace, and
+         omitting it keeps the page free of absolute-scheme URLs entirely,
+         rather than carrying one the verifier has to be trusted to forgive. -->
+    <svg class="rbt-plate rise d5" viewBox="0 0 600 420" aria-hidden="true"
+         focusable="false">
+      <!-- the sea: one horizon, then an engraver's water lines -->
+      <path class="rbt-sea" vector-effect="non-scaling-stroke" d="M0 232H600"/>
+      <path class="rbt-i3" vector-effect="non-scaling-stroke"
+            d="M60 246H300 M120 258H262 M338 258H470 M30 272H210
+               M150 288H330 M70 306H250 M210 322H352"/>
+      <!-- the headland, in three receding contours -->
+      <path class="rbt-i1" vector-effect="non-scaling-stroke"
+            d="M380 232C404 228 424 220 446 208C470 195 500 186 528 182C552 179 578 178 600 178"/>
+      <path class="rbt-i2" vector-effect="non-scaling-stroke"
+            d="M396 232C418 229 438 222 458 212C480 201 508 194 534 191C556 188 578 187 600 187"/>
+      <path class="rbt-i3" vector-effect="non-scaling-stroke"
+            d="M420 232C440 229 460 222 480 213C502 204 528 199 552 197C570 195 586 195 600 195"/>
+      <!-- the watchpost, its doorway, and the landing beneath it -->
+      <path class="rbt-i1" vector-effect="non-scaling-stroke"
+            d="M496 188V154H500V149H505V154H509V149H514V188"/>
+      <path class="rbt-i2" vector-effect="non-scaling-stroke" d="M503 188V174H507V188"/>
+      <path class="rbt-i2" vector-effect="non-scaling-stroke"
+            d="M398 234C380 240 362 246 346 250"/>
+      <path class="rbt-i3" vector-effect="non-scaling-stroke"
+            d="M384 236V244 M368 241V249 M354 246V254"/>
+    </svg>
   </section>
 
   <div class="band rise d4">
