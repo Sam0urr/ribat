@@ -1,21 +1,21 @@
 {
  "kind": "validation_summary",
- "generated": "2026-09-03",
- "months_through": "2026-08",
- "n_months_total": 500,
+ "generated": "2026-10-01",
+ "months_through": "2026-09",
+ "n_months_total": 501,
  "n_economies": 43,
  "sample_start": "2020-01",
  "t1": {
-  "cross_sectional_mean": 0.167,
-  "n_months": 80,
-  "pooled_pearson": 0.467,
-  "pooled_spearman": 0.506,
+  "cross_sectional_mean": 0.166,
+  "n_months": 81,
+  "pooled_pearson": 0.465,
+  "pooled_spearman": 0.503,
   "per_channel": {
-   "trade": 0.167,
+   "trade": 0.166,
    "va": 0.101,
    "energy": 0.276,
-   "crm": 0.192,
-   "choke": 0.185
+   "crm": 0.194,
+   "choke": 0.187
   }
  },
  "t2": {
@@ -23,27 +23,27 @@
    [
     "crm",
     "trade",
-    0.922
+    0.92
    ],
    [
     "trade",
     "va",
-    0.937
+    0.936
    ]
   ],
-  "mean_offdiagonal": 0.604,
+  "mean_offdiagonal": 0.602,
   "distinguishable_channels": 3
  },
  "t4": {
-  "residual_share": 0.138,
-  "month_share": 0.779,
-  "economy_share": 0.084,
-  "ranking_mobility": 0.51,
+  "residual_share": 0.139,
+  "month_share": 0.777,
+  "economy_share": 0.085,
+  "ranking_mobility": 0.507,
   "choke_ranking_mobility": 0.963
  },
  "anachronistic": {
   "through": "2019-12",
   "n": 420,
-  "share": 0.84
+  "share": 0.838
  }
 }

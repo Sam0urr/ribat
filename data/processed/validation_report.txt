@@ -1,9 +1,9 @@
 Intensity index - validation report
-generated 2026-09-03
-months 1985-01 to 2026-08, 43 economies, channels: choke, crm, energy, trade, va
-own-GPR panel through 2026-08, the source 03 built Intensity from (fresher of gpr_country_monthly.csv and web/data/gpr.json), so T1 and T4 share one sample
+generated 2026-10-01
+months 1985-01 to 2026-09, 43 economies, channels: choke, crm, energy, trade, va
+own-GPR panel through 2026-09, the source 03 built Intensity from (fresher of gpr_country_monthly.csv and web/data/gpr.json), so T1 and T4 share one sample
 benchmark years 2019, 2021, 2023 (trade_weights.csv); weights properly lagged from 2020-01; T1/T2/T4 Sample A use months >= 2020-01
-weights anachronistic or contemporaneous through 2019-12: 420 of 500 months (84.0%) use the 2019 benchmark - payload agrees
+weights anachronistic or contemporaneous through 2019-12: 420 of 501 months (83.8%) use the 2019 benchmark - payload agrees
 payload choke_self_excluded (strait dropped from own channel, sole covered littoral): {"SAU": ["hormuz"], "TUR": ["bosphorus"]}
 recomputed from chokepoints.csv over all six straits (covered littorals with a GPR series, economies with a trade channel): {"SAU": ["hormuz"], "TUR": ["bosphorus"]} - payload agrees
 
@@ -12,18 +12,18 @@ T1  DISCRIMINANT VALIDITY - is Intensity just re-plotting GPR?
 ========================================================================
   Sample: months >= 2020-01, the first properly lagged vintage. Earlier
   months use contemporaneous or anachronistic weights and are excluded.
-  Pooled Pearson  own-GPR vs Intensity :  0.467
-  Pooled Spearman own-GPR vs Intensity :  0.506
-  Cross-sectional Spearman, mean       :  0.167   (min -0.35, max  0.68, n=80 months)
+  Pooled Pearson  own-GPR vs Intensity :  0.465
+  Pooled Spearman own-GPR vs Intensity :  0.503
+  Cross-sectional Spearman, mean       :  0.166   (min -0.35, max  0.68, n=81 months)
   (headline: trade channel, gross basis)
 
   Per channel - own GPR (rebased) vs the channel's rebased value:
   channel  pooled Pearson  pooled Spearman  x-sect Spearman mean  (min, max, n months)
-  trade             0.467            0.506                 0.167  (-0.35,  0.68, n=80)
-  va                0.455            0.489                 0.101  (-0.38,  0.59, n=80)
-  energy            0.459            0.545                 0.276  (-0.29,  0.73, n=80)
-  crm               0.483            0.507                 0.192  (-0.24,  0.73, n=80)
-  choke             0.431            0.345                 0.185  (-0.48,  0.45, n=80)
+  trade             0.465            0.503                 0.166  (-0.35,  0.68, n=81)
+  va                0.453            0.487                 0.101  (-0.38,  0.59, n=81)
+  energy            0.457            0.542                 0.276  (-0.29,  0.73, n=81)
+  crm               0.483            0.506                 0.194  (-0.24,  0.73, n=81)
+  choke             0.430            0.346                 0.187  (-0.48,  0.45, n=81)
 
   Interpretation: values near +1 would mean the exposure weighting is
   redundant. Values near 0 mean Intensity ranks economies differently
@@ -39,14 +39,14 @@ T2  CHANNEL DISCRIMINATION - are the sliders decorative?
   Spearman over economy-months, rebased values.
 channel  choke    crm  energy  trade     va
 channel                                    
-choke    1.000  0.274   0.200  0.226  0.289
-crm      0.274  1.000   0.746  0.922  0.900
-energy   0.200  0.746   1.000  0.778  0.764
-trade    0.226  0.922   0.778  1.000  0.937
-va       0.289  0.900   0.764  0.937  1.000
+choke    1.000  0.270   0.200  0.223  0.286
+crm      0.270  1.000   0.744  0.920  0.897
+energy   0.200  0.744   1.000  0.777  0.763
+trade    0.223  0.920   0.777  1.000  0.936
+va       0.286  0.897   0.763  0.936  1.000
 
-  Mean off-diagonal Spearman:  0.604
-  Pairs above 0.9: crm-trade 0.922, trade-va 0.937
+  Mean off-diagonal Spearman:  0.602
+  Pairs above 0.9: crm-trade 0.920, trade-va 0.936
   Distinguishable channels at that threshold: 3 - crm/trade/va; choke; energy
   choke vs the other channels: 0.20-0.29
   energy vs the other channels: 0.20-0.78
@@ -125,27 +125,27 @@ T4  STATIC STRUCTURE OR TIME SERIES? - two-way fixed effects
 
   Sample A: months >= 2020-01 (first properly lagged vintage)
   series                   N    T  economy   month    both  residual   rank(t, t-12) mean (min, max, n)
-  Intensity (default mix)  42   80    0.084   0.779   0.862     0.138   0.510 (-0.47, 0.93, n=68)
-  trade                   42   80    0.075   0.819   0.895     0.105   0.480 (-0.51, 0.93, n=68)
-  va                      42   80    0.012   0.937   0.949     0.051   0.318 (-0.75, 0.95, n=68)
-  energy                  42   80    0.233   0.506   0.739     0.261   0.701 (0.15, 0.95, n=68)
-  crm                     42   80    0.069   0.759   0.827     0.173   0.399 (-0.45, 0.80, n=68)
-  choke                   42   80    0.583   0.248   0.831     0.169   0.963 (0.88, 1.00, n=68)
-  robustness, default mix in log10 (N=42, 0 economies with a non-positive value dropped): economy 0.103, month 0.803, residual 0.095
+  Intensity (default mix)  42   81    0.085   0.777   0.861     0.139   0.507 (-0.47, 0.93, n=69)
+  trade                   42   81    0.077   0.817   0.894     0.106   0.474 (-0.51, 0.93, n=69)
+  va                      42   81    0.013   0.936   0.949     0.051   0.313 (-0.75, 0.95, n=69)
+  energy                  42   81    0.235   0.504   0.739     0.261   0.702 (0.15, 0.95, n=69)
+  crm                     42   81    0.070   0.756   0.826     0.174   0.398 (-0.45, 0.80, n=69)
+  choke                   42   81    0.587   0.246   0.833     0.167   0.963 (0.88, 1.00, n=69)
+  robustness, default mix in log10 (N=42, 0 economies with a non-positive value dropped): economy 0.104, month 0.801, residual 0.095
 
-  Sample B: full sample 1985-01 to 2026-08
+  Sample B: full sample 1985-01 to 2026-09
   CAVEAT: weights are anachronistic or contemporaneous through 2019-12
-  (420 of 500 months, 84.0%): those months answer
+  (420 of 501 months, 83.8%): those months answer
   'who would be exposed given the earliest benchmark structure', so month
   effects here mix world risk with a frozen 2019 dependency map.
   series                   N    T  economy   month    both  residual   rank(t, t-12) mean (min, max, n)
-  Intensity (default mix)  42  500    0.041   0.849   0.891     0.109   0.593 (-0.47, 0.95, n=488)
-  trade                   42  500    0.043   0.870   0.913     0.087   0.574 (-0.51, 0.97, n=488)
-  va                      42  500    0.008   0.954   0.963     0.037   0.495 (-0.75, 0.96, n=488)
-  energy                  42  500    0.140   0.617   0.757     0.243   0.736 (-0.10, 0.96, n=488)
-  crm                     42  500    0.057   0.767   0.824     0.176   0.547 (-0.45, 0.96, n=488)
-  choke                   42  500    0.386   0.385   0.771     0.229   0.955 (0.79, 1.00, n=488)
-  robustness, default mix in log10 (N=42, 0 economies with a non-positive value dropped): economy 0.079, month 0.832, residual 0.089
+  Intensity (default mix)  42  501    0.041   0.849   0.891     0.109   0.593 (-0.47, 0.95, n=489)
+  trade                   42  501    0.043   0.870   0.913     0.087   0.573 (-0.51, 0.97, n=489)
+  va                      42  501    0.008   0.954   0.963     0.037   0.494 (-0.75, 0.96, n=489)
+  energy                  42  501    0.140   0.617   0.757     0.243   0.736 (-0.10, 0.96, n=489)
+  crm                     42  501    0.057   0.767   0.824     0.176   0.547 (-0.45, 0.96, n=489)
+  choke                   42  501    0.386   0.385   0.771     0.229   0.955 (0.79, 1.00, n=489)
+  robustness, default mix in log10 (N=42, 0 economies with a non-positive value dropped): economy 0.079, month 0.833, residual 0.089
 
   Interpretation: a residual share near zero means Intensity is a fixed
   dependency structure recoloured by a global factor - the cross-section
@@ -155,5 +155,5 @@ T4  STATIC STRUCTURE OR TIME SERIES? - two-way fixed effects
   economy-specific month-to-month variation. Ranking mobility above
   0.90 means the cross-sectional ranking barely moves within a year.
 
-  Verdict (Sample A, default mix): residual 0.138 -> partly dynamic: most variance is economy structure plus a common month factor, but a material share is economy-specific movement.
-  Ranking mobility 0.510 -> the ranking does move within a year.
+  Verdict (Sample A, default mix): residual 0.139 -> partly dynamic: most variance is economy structure plus a common month factor, but a material share is economy-specific movement.
+  Ranking mobility 0.507 -> the ranking does move within a year.
