@@ -1,21 +1,21 @@
 {
  "kind": "validation_summary",
- "generated": "2026-10-01",
- "months_through": "2026-09",
- "n_months_total": 501,
+ "generated": "2026-11-02",
+ "months_through": "2026-10",
+ "n_months_total": 502,
  "n_economies": 43,
  "sample_start": "2020-01",
  "t1": {
   "cross_sectional_mean": 0.166,
-  "n_months": 81,
-  "pooled_pearson": 0.465,
+  "n_months": 82,
+  "pooled_pearson": 0.463,
   "pooled_spearman": 0.503,
   "per_channel": {
    "trade": 0.166,
    "va": 0.101,
-   "energy": 0.276,
+   "energy": 0.274,
    "crm": 0.194,
-   "choke": 0.187
+   "choke": 0.186
   }
  },
  "t2": {
@@ -35,15 +35,15 @@
   "distinguishable_channels": 3
  },
  "t4": {
-  "residual_share": 0.139,
-  "month_share": 0.777,
-  "economy_share": 0.085,
-  "ranking_mobility": 0.507,
+  "residual_share": 0.138,
+  "month_share": 0.776,
+  "economy_share": 0.086,
+  "ranking_mobility": 0.514,
   "choke_ranking_mobility": 0.963
  },
  "anachronistic": {
   "through": "2019-12",
   "n": 420,
-  "share": 0.838
+  "share": 0.837
  }
 }
